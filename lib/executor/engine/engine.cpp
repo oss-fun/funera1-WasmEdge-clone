@@ -19,6 +19,10 @@ void signalHandler(int signum) {
     DumpFlag = true;
   DumpFlag = true;
 }
+struct SourceLoc {
+  uint32_t funcIdx;
+  uint32_t offset;
+};
 
 Expect<void> Executor::runExpression(Runtime::StackManager &StackMgr,
                                      AST::InstrView Instrs) {
@@ -1845,18 +1849,10 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
   signal(SIGINT, &signalHandler);
 
   int cnt = 0;
-  while (PC != PCEnd) {
-    // restoreした場合に、restoreした直後にdumpしたimgファイルと、restore元のimgファイルは一致することを確認するもの
-    // if (restoreTestFlag && Conf.getStatisticsConfigure().getRestoreFlag()) {
-    //   Migr.dumpIter(PC, "restored_");
-    //   std::cout << "Success dumpIter" << std::endl;
-    //   Migr.dumpStackMgrFrame(StackMgr, "restored_");
-    //   std::cout << "Success dumpStackMgrFrame" << std::endl;
-    //   Migr.dumpStackMgrValue(StackMgr, "restored_");
-    //   std::cout << "Success dumpStackMgrValue" << std::endl;
-    //   restoreTestFlag = false;
-    // }
+  bool isInteractiveMode = true;
+  SourceLoc breakPoint;
 
+  while (PC != PCEnd) {
     if (DumpFlag) {
       Migr.dumpIter(PC);
       std::cout << "Success dumpIter" << std::endl;
@@ -1883,30 +1879,15 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
         }
       }
     }
+
+    // PCのsource locationとbreakで与えられたsource locationが一致するか判定し、一致する場合、isInteractiveMode = trueにする
+    // source locationはとりあえず(func_idx, offset)とする
+
+    // if ()
     
-    std::string command;
-    while(1) {
-      OpCode Code = PC->getOpCode();
-      std::cout << cnt << " " << Code << std::endl;
-      std::cin >> command;
-
-      // 表示する横の長さ
-      // const int a = 28;
-
-      if (command == "info stack" || command == "i s") {
-        int size = StackMgr.size();
-        auto stack = StackMgr.getTopN(size);
-
-        std::cout << "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓";
-        for (int i = size-1; i >= 0; i++) {
-          std::cout << "┃  " << StackMgr.getTopN(i) << "  ┃" << std::endl;
-          std::cout << "┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫";
-        }  
-        std::cout << "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛";
-      }
-      else {
-        break;
-      }
+    if (isInteractiveMode) {
+      IntaractiveMode();
+      isInteractiveMode = false;
     }
      
     if (auto Res = Dispatch(); !Res) {
@@ -1917,6 +1898,48 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     cnt++;
   }
   return {};
+}
+
+
+void InteractiveMode() {
+  std::string command;
+  while(1) {
+    std::cin >> command;
+    vector<std::string> commands = Split(command, ' ');
+
+    if (commands[0] == "break") {
+      // break funcname offset
+      std::string funcname = commands[1];
+      int offset = stoi(commands[2]);
+    }
+
+    // Info commands
+    if (commands[0] == "info") {
+      printStack();
+    }
+  }
+}
+
+std::vector<std::string> Split(std::string &s, char delim) {
+  std::vector<std::string> elems;
+  std::string item;
+  for (char ch : s) {
+    if (ch == delim) {
+      if (!item.empty()) elems.push_back(item);
+      item.clear();
+    }
+    else {
+      item += ch;
+    }
+  }
+  if (!item.empty()) elems.push_back(item);
+
+  return elems;
+}
+
+
+void printStack() {
+
 }
 
 } // namespace Executor
