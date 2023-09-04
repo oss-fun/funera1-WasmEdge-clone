@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2022 Second State INC
 
 #include "executor/executor.h"
+#include "./debugger.cpp"
 
 #include <array>
 #include <cstdint>
@@ -13,16 +14,13 @@ namespace Executor {
 
 bool DumpFlag;
 bool restoreTestFlag = true;
+bool isInteractiveMode = true;
 // TODO: signumの処理無駄なのでどうにかする
 void signalHandler(int signum) {
   if (signum)
     DumpFlag = true;
   DumpFlag = true;
 }
-struct SourceLoc {
-  uint32_t funcIdx;
-  uint32_t offset;
-};
 
 Expect<void> Executor::runExpression(Runtime::StackManager &StackMgr,
                                      AST::InstrView Instrs) {
@@ -1849,8 +1847,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
   signal(SIGINT, &signalHandler);
 
   int cnt = 0;
-  bool isInteractiveMode = true;
-  SourceLoc breakPoint;
+  SourceLoc breakpoint;
 
   while (PC != PCEnd) {
     if (DumpFlag) {
@@ -1882,11 +1879,15 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
 
     // PCのsource locationとbreakで与えられたsource locationが一致するか判定し、一致する場合、isInteractiveMode = trueにする
     // source locationはとりあえず(func_idx, offset)とする
-
-    // if ()
+    SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
+    if (PCSourceLoc == breakpoint) {
+      isInteractiveMode = true;
+    }
     
     if (isInteractiveMode) {
-      IntaractiveMode();
+      OpCode Code = PC->getOpCode();
+      std::cout << "Code is " << static_cast<int>(Code) << std::endl;
+      InteractiveMode(breakpoint);
       isInteractiveMode = false;
     }
      
@@ -1901,46 +1902,6 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
 }
 
 
-void InteractiveMode() {
-  std::string command;
-  while(1) {
-    std::cin >> command;
-    vector<std::string> commands = Split(command, ' ');
-
-    if (commands[0] == "break") {
-      // break funcname offset
-      std::string funcname = commands[1];
-      int offset = stoi(commands[2]);
-    }
-
-    // Info commands
-    if (commands[0] == "info") {
-      printStack();
-    }
-  }
-}
-
-std::vector<std::string> Split(std::string &s, char delim) {
-  std::vector<std::string> elems;
-  std::string item;
-  for (char ch : s) {
-    if (ch == delim) {
-      if (!item.empty()) elems.push_back(item);
-      item.clear();
-    }
-    else {
-      item += ch;
-    }
-  }
-  if (!item.empty()) elems.push_back(item);
-
-  return elems;
-}
-
-
-void printStack() {
-
-}
 
 } // namespace Executor
 } // namespace WasmEdge

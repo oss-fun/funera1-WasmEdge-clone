@@ -20,16 +20,20 @@ namespace Runtime {
 }
 
 namespace Executor {
+struct SourceLoc {
+  bool operator==(const SourceLoc& rhs) const {
+    return (FuncIdx == rhs.FuncIdx && Offset == rhs.Offset);
+  }
+
+  uint32_t FuncIdx;
+  uint32_t Offset;
+};
 
 class Migrator {
 public:
-  struct IterData {
-    uint32_t FuncIdx;
-    uint32_t Offset;
-  };
   /// TODO: ModuleInstanceがnullだったときの名前。重複しないようにする
   const std::string NULL_MOD_NAME = "null";
-  using IterMigratorType = std::map<AST::InstrView::iterator, IterData>;
+  using IterMigratorType = std::map<AST::InstrView::iterator, SourceLoc>;
 
   /// ================
   /// Interface
@@ -71,7 +75,7 @@ public:
       
       uint32_t Offset = 0;
       while (PC != PCEnd) {
-        IterMigrator[PC] = {I, Offset};
+        IterMigrator[PC] = SourceLoc{I, Offset};
         Offset++;
         PC++;
       }
@@ -97,6 +101,14 @@ public:
       IterMigratorType I;
       return I;
     }
+  }
+
+  SourceLoc getSourceLoc(AST::InstrView::iterator Iter) {
+    IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
+    assert(IterMigrator);
+
+    struct SourceLoc Data = IterMigrator[Iter];
+    return Data;
   }
   
   uint128_t stou128(std::string s) {
@@ -126,7 +138,7 @@ public:
     IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
     assert(IterMigrator);
 
-    struct IterData Data = IterMigrator[Iter];
+    struct SourceLoc Data = IterMigrator[Iter];
     std::ofstream iterStream;
     iterStream.open(fname_header + "iter.img", std::ios::trunc);
 
@@ -167,7 +179,7 @@ public:
       
       // Iterator
       IterMigratorType IterMigrator = getIterMigrator(ModInst);
-      struct IterData Data = IterMigrator[const_cast<AST::InstrView::iterator>(f.From)];
+      struct SourceLoc Data = IterMigrator[const_cast<AST::InstrView::iterator>(f.From)];
       FrameStream << Data.FuncIdx << std::endl;
       FrameStream << Data.Offset << std::endl;
 

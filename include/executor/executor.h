@@ -89,6 +89,7 @@ using TypeNN =
 
 } // namespace
 
+
 /// Executor flow control class.
 class Executor {
 public:
@@ -695,6 +696,7 @@ private:
   Runtime::StoreManager StoreMgr;
 public:
   void setStoreMgrToMigr(Runtime::StoreManager& StoreMgr) { Migr.NamedMod = StoreMgr.NamedMod; }
+
 };
 
 } // namespace Executor
