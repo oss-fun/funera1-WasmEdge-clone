@@ -35,7 +35,7 @@ void Help() {
     std::cout << "\033[1m" "break" " -- Making program stop at cerain point" "\x1b[0m" << std::endl;
 }
 
-void InteractiveMode(SourceLoc &bp) {
+void InteractiveMode(SourceLoc &bp, SourceLoc pc) {
   std::string command;
   while(1) {
     std::cout << "\x1b[31m" << "wdb$ " << "\x1b[0m";
@@ -44,7 +44,7 @@ void InteractiveMode(SourceLoc &bp) {
     std::vector<std::string> commands = Split(command, ' ');
 
     // break funcidx offset
-    if (commands[0] == "break") {
+    if (commands[0] == "b" || commands[0] == "break") {
       if (commands.size() != 3) {
         Help();
         continue;
@@ -52,12 +52,22 @@ void InteractiveMode(SourceLoc &bp) {
       bp.FuncIdx = stoi(commands[1]);
       bp.Offset = stoi(commands[2]);
     }
-    else if (commands[0] == "run") {
+    else if (commands[0] == "r" || commands[0] == "run") {
+        return;
+    }
+    else if (commands[0] == "ni" || commands[0] == "nexti") {
+        bp.FuncIdx = pc.FuncIdx;
+        bp.Offset = pc.Offset + 1;
         return;
     }
     // Info commands
-    else if (commands[0] == "info") {
+    else if (commands[0] == "i" || commands[0] == "info") {
       // printStack();
+      if (commands[1] == "pc") {
+        std::cout << "PC is " << pc.FuncIdx << " " << pc.Offset << std::endl;
+      }
+    }
+    else if (commands[0] == "d" || commands[0] == "dump") {
     }
     else {
         Help();

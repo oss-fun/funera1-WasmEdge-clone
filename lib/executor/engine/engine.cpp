@@ -15,6 +15,8 @@ namespace Executor {
 bool DumpFlag;
 bool restoreTestFlag = true;
 bool isInteractiveMode = true;
+SourceLoc breakpoint;
+
 // TODO: signumの処理無駄なのでどうにかする
 void signalHandler(int signum) {
   if (signum)
@@ -65,16 +67,20 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
     // Restore
     if (RestoreFlag && Conf.getStatisticsConfigure().getRestoreFlag()) {
       std::cout << "### Restore! ###" << std::endl;
-      StartIt = Migr.restoreIter(Func.getModule());
-      StackMgr = Migr.restoreStackMgr();
+      auto Res = Migr.restoreIter(Func.getModule());
+      if (!Res) {
+        return Unexpect(Res);
+      }
+      StartIt = Res.value();
+      std::cout << "Success to restore iter" << std::endl;
+
+      StackMgr = Migr.restoreStackMgr().value();
+      std::cout << "Success to restore stack" << std::endl;
       
       /// restoreしたものが元のものと一致するかtest
       Migr.dumpIter(StartIt, "restored_");
-      std::cout << "Success dumpIter" << std::endl;
       Migr.dumpStackMgrFrame(StackMgr, "restored_");
-      std::cout << "Success dumpStackMgrFrame" << std::endl;
       Migr.dumpStackMgrValue(StackMgr, "restored_");
-      std::cout << "Success dumpStackMgrValue" << std::endl;
 
       RestoreFlag = false;
     }
@@ -1847,20 +1853,8 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
   signal(SIGINT, &signalHandler);
 
   int cnt = 0;
-  SourceLoc breakpoint;
 
   while (PC != PCEnd) {
-    if (DumpFlag) {
-      Migr.dumpIter(PC);
-      std::cout << "Success dumpIter" << std::endl;
-      Migr.dumpStackMgrFrame(StackMgr);
-      std::cout << "Success dumpStackMgrFrame" << std::endl;
-      Migr.dumpStackMgrValue(StackMgr);
-      std::cout << "Success dumpStackMgrValue" << std::endl;
-      // TODO: 途中で止まったことがわかるエラーを返す
-      return {};
-    }
-
     if (Stat) {
       OpCode Code = PC->getOpCode();
       if (Conf.getStatisticsConfigure().isInstructionCounting()) {
@@ -1880,6 +1874,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     // PCのsource locationとbreakで与えられたsource locationが一致するか判定し、一致する場合、isInteractiveMode = trueにする
     // source locationはとりあえず(func_idx, offset)とする
     SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
+    std::cout << "PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;
     if (PCSourceLoc == breakpoint) {
       isInteractiveMode = true;
     }
@@ -1887,9 +1882,23 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     if (isInteractiveMode) {
       OpCode Code = PC->getOpCode();
       std::cout << "Code is " << static_cast<int>(Code) << std::endl;
-      InteractiveMode(breakpoint);
+      InteractiveMode(breakpoint, PCSourceLoc);
       isInteractiveMode = false;
     }
+
+    if (DumpFlag) {
+      Migr.dumpIter(PC);
+      std::cout << "Success dumpIter" << std::endl;
+      Migr.dumpStackMgrFrame(StackMgr);
+      std::cout << "Success dumpStackMgrFrame" << std::endl;
+      Migr.dumpStackMgrValue(StackMgr);
+      std::cout << "Success dumpStackMgrValue" << std::endl;
+      // TODO: 途中で止まったことがわかるエラーを返す
+
+      InteractiveMode(breakpoint, PCSourceLoc);
+      isInteractiveMode = false;
+    }
+
      
     if (auto Res = Dispatch(); !Res) {
       return Unexpect(Res);
