@@ -332,7 +332,7 @@ public:
   // Migration functions
 
   // filename = meminst_{i}
-  void dump(std::string filename) const noexcept {
+  Expect<void> dump(std::string filename) const noexcept {
     std::ofstream dataPtrStream, memTypeStream;
 
     // Open file
@@ -341,15 +341,21 @@ public:
     dataPtrStream.open(dataPtrFile, std::ios::trunc);
     memTypeStream.open(memTypeFile, std::ios::trunc);
 
-    // DataPtrとPageLimitをfileにdump
-    auto Res = getBytes(0, MemType.getLimit().getMin() * kPageSize);
-    for (size_t i = 0; i < Res.value().size(); i++) 
-      dataPtrStream << *(Res.value().data() + i);
-    memTypeStream << MemType.getLimit().getMin() << std::endl;
-
-    // Close file
-    dataPtrStream.close();
+    // PageLimitをfileにdump
+    uint32_t memLimit = MemType.getLimit().getMin();
+    memTypeStream << memLimit << std::endl;
     memTypeStream.close();
+
+    // DataPtrをfileにdump
+    auto Res = getBytes(0, memLimit * kPageSize);
+    if (unlikely(!Res)) {
+      return Unexpect(Res);
+    }
+    for (size_t i = 0; i < Res.value().size(); i++) {
+      dataPtrStream << *(Res.value().data() + i);
+    }
+    dataPtrStream.close();
+    return {};
   }
 
   void restore(std::string filename) noexcept {
@@ -361,7 +367,7 @@ public:
     dataPtrStream.open(dataPtrFile);
     if (!dataPtrStream) {
       std::cout << "\x1b[31m";
-      std::cout << "Error: Failed to open " << memTypeFile << std::endl;
+      std::cout << "Error: Failed to open " << dataPtrFile << std::endl;
       std::cout << "\x1b[m";
     }
 
