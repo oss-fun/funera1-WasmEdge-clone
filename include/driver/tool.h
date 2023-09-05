@@ -109,6 +109,7 @@ struct DriverToolOptions {
   PO::Option<PO::Toggle> ConfEnableAllStatistics;
   PO::Option<PO::Toggle> ConfForceInterpreter;
   PO::Option<PO::Toggle> RestoreFlag;
+  PO::Option<PO::Toggle> DebugMode;
   PO::Option<uint64_t> TimeLim;
   PO::List<int> GasLim;
   PO::List<int> MemLim;
@@ -139,6 +140,7 @@ struct DriverToolOptions {
         .add_option("enable-threads"sv, PropThreads)
         .add_option("enable-all"sv, PropAll)
         .add_option("restore-flag"sv, RestoreFlag)
+        .add_option("debug-mode"sv, DebugMode)
         .add_option("time-limit"sv, TimeLim)
         .add_option("gas-limit"sv, GasLim)
         .add_option("memory-page-limit"sv, MemLim)

@@ -1869,21 +1869,23 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
           return Unexpect(ErrCode::Value::CostLimitExceeded);
         }
       }
-    }
-
-    // PCのsource locationとbreakで与えられたsource locationが一致するか判定し、一致する場合、isInteractiveMode = trueにする
-    // source locationはとりあえず(func_idx, offset)とする
-    SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
-    std::cout << "PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;
-    if (PCSourceLoc == breakpoint) {
-      isInteractiveMode = true;
-    }
-    
-    if (isInteractiveMode) {
-      OpCode Code = PC->getOpCode();
-      std::cout << "Code is " << static_cast<int>(Code) << std::endl;
-      InteractiveMode(breakpoint, PCSourceLoc);
-      isInteractiveMode = false;
+      // DebugMode
+      if (isInteractiveMode && Conf.getStatisticsConfigure().getDebugMode()) {
+        // PCのsource locationとbreakで与えられたsource locationが一致するか判定し、一致する場合、isInteractiveMode = trueにする
+        // source locationはとりあえず(func_idx, offset)とする
+        SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
+        // std::cout << "PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;
+        if (PCSourceLoc == breakpoint) {
+          isInteractiveMode = true;
+        }
+        
+        if (isInteractiveMode) {
+          OpCode Code = PC->getOpCode();
+          std::cout << "Code is " << static_cast<int>(Code) << std::endl;
+          InteractiveMode(breakpoint, PCSourceLoc);
+          isInteractiveMode = false;
+        }
+      }
     }
 
     if (DumpFlag) {
@@ -1894,9 +1896,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
       Migr.dumpStackMgrValue(StackMgr);
       std::cout << "Success dumpStackMgrValue" << std::endl;
       // TODO: 途中で止まったことがわかるエラーを返す
-
-      InteractiveMode(breakpoint, PCSourceLoc);
-      isInteractiveMode = false;
+      return {};
     }
 
      

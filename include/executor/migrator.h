@@ -265,6 +265,7 @@ public:
     FrameStack.reserve(16U);
     std::string FrameString;
     /// TODO: ループ条件見直す
+    std::map<std::string, const Runtime::Instance::ModuleInstance*> ModCache;
     while(getline(FrameStream, FrameString)) {
       // ModuleInstance
       std::string ModName = FrameString;
@@ -293,27 +294,34 @@ public:
         // std::cout << "ModInst is nullptr" << std::endl;
         assert(-1);
       }
-      // std::cout << "restore frame: 2" << std::endl;
+      std::cout << "restore frame: 2" << std::endl;
 
       /// TODO: 同じModuleの復元をしないよう、キャッシュを作る
-      if (1) {
+      if (ModCache.count(ModName) == 0) {
         // std::cout << ModInst->getMemoryNum() << std::endl;
         ModInst->restoreMemInst(std::string(ModName));
+        std::cout << "Success restore meminst" << std::endl;
         ModInst->restoreGlobInst(std::string(ModName));
+        std::cout << "Success restore globinst" << std::endl;
+        ModCache[ModName] = ModInst;
       }
-      // std::cout << "restore frame: 3" << std::endl;
+      else {
+        ModInst = ModCache[ModName];
+      }
+      std::cout << "restore frame: 3" << std::endl;
 
       // Iterator
       getline(FrameStream, FrameString);
       uint32_t FuncIdx = static_cast<uint32_t>(std::stoul(FrameString));
       getline(FrameStream, FrameString);
       uint32_t Offset = static_cast<uint32_t>(std::stoul(FrameString));
-      // auto Res = __restoreIter(ModInst, FuncIdx, Offset);
-      // if (!Res) {
-      //   return Unexpect(Res);
-      // }
-      AST::InstrView::iterator From = _restoreIter(ModInst, FuncIdx, Offset).value();
-      // std::cout << "restore frame: 4" << std::endl;
+      auto Res = _restoreIter(ModInst, FuncIdx, Offset);
+      if (!Res) {
+        return Unexpect(Res);
+      }
+      AST::InstrView::iterator From = Res.value();
+      // AST::InstrView::iterator From = _restoreIter(ModInst, FuncIdx, Offset).value();
+      std::cout << "restore frame: 4" << std::endl;
 
       // Locals, VPos, Arity
       getline(FrameStream, FrameString);
@@ -322,7 +330,7 @@ public:
       uint32_t VPos = static_cast<uint32_t>(std::stoul(FrameString));
       getline(FrameStream, FrameString);
       uint32_t Arity = static_cast<uint32_t>(std::stoul(FrameString));
-      // std::cout << "restore frame: 5" << std::endl;
+      std::cout << "restore frame: 5" << std::endl;
 
       Runtime::StackManager::Frame f(ModInst, From, Locals, Arity, VPos);
       FrameStack.push_back(f);
