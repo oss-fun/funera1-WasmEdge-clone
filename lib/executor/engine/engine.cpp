@@ -78,10 +78,10 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
       std::cout << "Success to restore stack" << std::endl;
       
       /// restoreしたものが元のものと一致するかtest
-      Migr.dumpIter(StartIt, "restored_");
-      Migr.dumpStackMgrFrame(StackMgr, "restored_");
-      Migr.dumpStackMgrValue(StackMgr, "restored_");
-      std::cout << "Success to dump restore file" << std::endl;
+      // Migr.dumpIter(StartIt, "restored_");
+      // Migr.dumpStackMgrFrame(StackMgr, "restored_");
+      // Migr.dumpStackMgrValue(StackMgr, "restored_");
+      // std::cout << "Success to dump restore file" << std::endl;
 
       RestoreFlag = false;
     }

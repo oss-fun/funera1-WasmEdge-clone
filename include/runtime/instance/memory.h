@@ -356,11 +356,14 @@ public:
     // restoreFileをparseする
     std::ifstream dataPtrStream, memTypeStream;
 
-    // Open file
+    // Restore DataPtr
     std::string dataPtrFile = filename + "_dataptr.img";
-    std::string memTypeFile = filename + "_memtype.img";
     dataPtrStream.open(dataPtrFile);
-    memTypeStream.open(memTypeFile);
+    if (!dataPtrStream) {
+      std::cout << "\x1b[31m";
+      std::cout << "Error: Failed to open " << memTypeFile << std::endl;
+      std::cout << "\x1b[m";
+    }
 
     // TODO: DataPtrとPageLimitを読み取って、それぞれに代入する
     char ch;
@@ -371,29 +374,37 @@ public:
       size++;
     }
     setBytes(Span<Byte>{byteVec}, 0, 0, size);
+
+    dataPtrStream.close();
     
     // Restore MemType
+    std::string memTypeFile = filename + "_memtype.img";
+    memTypeStream.open(memTypeFile);
+    if (!memTypeStream) {
+      std::cout << "\x1b[31m";
+      std::cout << "Error: Failed to open " << memTypeFile << std::endl;
+      std::cout << "\x1b[m";
+    }
     std::string memTypeString;
     getline(memTypeStream, memTypeString);
+    memTypeStream.close();
+
     uint32_t memLimit;
     try {
       memLimit = stoi(memTypeString);
     } catch (const std::invalid_argument& e) {
       std::cout << "\x1b[31m";
-      std::cout << "MemTypeString[" << memTypeString << "]: invalid argument" << std::endl;
+      std::cout << "Error: MemTypeString[" << memTypeString << "]: invalid argument" << std::endl;
       std::cout << "\x1b[m";
       // return Unexpect(ErrCode::Value::UserDefError);
     } catch (const std::out_of_range& e) {
       std::cout << "\x1b[31m";
-      std::cout << "MemTypeString[" << memTypeString << "]: out of range" << std::endl;
+      std::cout << "Error: MemTypeString[" << memTypeString << "]: out of range" << std::endl;
       std::cout << "\x1b[m";
       // return Unexpect(e);
     }
     MemType.getLimit().setMin(memLimit);
 
-    // Close file
-    dataPtrStream.close();
-    memTypeStream.close();
   }
 
 private:
