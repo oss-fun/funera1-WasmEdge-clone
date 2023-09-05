@@ -352,7 +352,7 @@ public:
     memTypeStream.close();
   }
 
-  void restore(std::string filename)  noexcept {
+  void restore(std::string filename) noexcept {
     // restoreFileをparseする
     std::ifstream dataPtrStream, memTypeStream;
 
@@ -375,7 +375,21 @@ public:
     // Restore MemType
     std::string memTypeString;
     getline(memTypeStream, memTypeString);
-    MemType.getLimit().setMin(stoi(memTypeString));
+    uint32_t memLimit;
+    try {
+      memLimit = stoi(memTypeString);
+    } catch (const std::invalid_argument& e) {
+      std::cout << "\x1b[31m";
+      std::cout << "MemTypeString[" << memTypeString << "]: invalid argument" << std::endl;
+      std::cout << "\x1b[m";
+      // return Unexpect(ErrCode::Value::UserDefError);
+    } catch (const std::out_of_range& e) {
+      std::cout << "\x1b[31m";
+      std::cout << "MemTypeString[" << memTypeString << "]: out of range" << std::endl;
+      std::cout << "\x1b[m";
+      // return Unexpect(e);
+    }
+    MemType.getLimit().setMin(memLimit);
 
     // Close file
     dataPtrStream.close();
