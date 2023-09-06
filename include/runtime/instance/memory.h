@@ -338,7 +338,7 @@ public:
     // Open file
     std::string dataPtrFile = filename + "_dataptr.img";
     std::string memTypeFile = filename + "_memtype.img";
-    dataPtrStream.open(dataPtrFile, std::ios::trunc);
+    dataPtrStream.open(dataPtrFile, std::ios::trunc | std::ios::binary);
     memTypeStream.open(memTypeFile, std::ios::trunc);
 
     // PageLimitをfileにdump
@@ -351,9 +351,12 @@ public:
     if (unlikely(!Res)) {
       return Unexpect(Res);
     }
-    for (size_t i = 0; i < Res.value().size(); i++) {
-      dataPtrStream << *(Res.value().data() + i);
-    }
+    Span<Byte> Data = Res.value();
+    dataPtrStream.write((char*)&Data, Data.size()*sizeof(Data));
+    // dataPtrStream << Data;
+    // for (size_t i = 0; i < Data.size(); i++) {
+    //   dataPtrStream << *(Data.data() + i);
+    // }
     dataPtrStream.close();
     return {};
   }
@@ -364,7 +367,7 @@ public:
 
     // Restore DataPtr
     std::string dataPtrFile = filename + "_dataptr.img";
-    dataPtrStream.open(dataPtrFile);
+    dataPtrStream.open(dataPtrFile, std::ios::binary);
     if (!dataPtrStream) {
       std::cout << "\x1b[31m";
       std::cout << "Error: Failed to open " << dataPtrFile << std::endl;
@@ -372,14 +375,16 @@ public:
     }
 
     // TODO: DataPtrとPageLimitを読み取って、それぞれに代入する
-    char ch;
+    Byte byte;
     std::vector<Byte> byteVec(0);
     int size = 0;
-    while (dataPtrStream.get(ch)) {
-      byteVec.push_back((Byte)ch);
+    // while (dataPtrStream.read(&byte, sizeof(byte))) {
+    while(!dataPtrStream.eof()) {
+      dataPtrStream.read((char*)&byte, sizeof(byte));
+      byteVec.push_back(byte);
       size++;
     }
-    setBytes(Span<Byte>{byteVec}, 0, 0, size);
+    setBytes(Span<Byte>(byteVec), 0, 0, size);
 
     dataPtrStream.close();
     

@@ -216,6 +216,9 @@ public:
     auto Res = ModInst->getFunc(FuncIdx);
     if (unlikely(!Res)) {
       // spdlog::error(ErrInfo::InfoAST(ASTNodeAttr::Seg_Element));
+      std::cout << "\x1b[31m";
+      std::cout << "ERROR: _restoreIter" << std::endl;
+      std::cout << "\x1b[1m";
       return Unexpect(Res);
     }
     Runtime::Instance::FunctionInstance* FuncInst = Res.value();
@@ -299,9 +302,6 @@ public:
 
       // ModInstがnullの場合
       if (ModName == NULL_MOD_NAME) {
-        // AST::InstrView::iterator From;
-        // uint32_t Locals, VPos, Arity;
-
         Runtime::StackManager::Frame f(nullptr, nullptr, 0, 0, 0);
         FrameStack.push_back(f);
 
