@@ -78,10 +78,10 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
       std::cout << "Success to restore stack" << std::endl;
       
       /// restoreしたものが元のものと一致するかtest
-      // Migr.dumpIter(StartIt, "restored_");
-      // Migr.dumpStackMgrFrame(StackMgr, "restored_");
-      // Migr.dumpStackMgrValue(StackMgr, "restored_");
-      // std::cout << "Success to dump restore file" << std::endl;
+      Migr.dumpIter(StartIt, "restored_");
+      Migr.dumpStackMgrFrame(StackMgr, "restored_");
+      Migr.dumpStackMgrValue(StackMgr, "restored_");
+      std::cout << "Success to dump restore file" << std::endl;
 
       RestoreFlag = false;
     }
@@ -1870,19 +1870,20 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
           return Unexpect(ErrCode::Value::CostLimitExceeded);
         }
       }
-      // DebugMode
+      
       if (isInteractiveMode && Conf.getStatisticsConfigure().getDebugMode()) {
+        // DebugMode
         // PCのsource locationとbreakで与えられたsource locationが一致するか判定し、一致する場合、isInteractiveMode = trueにする
         // source locationはとりあえず(func_idx, offset)とする
         SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
-        // std::cout << "PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;
+        std::cout << "PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;
         if (PCSourceLoc == breakpoint) {
           isInteractiveMode = true;
         }
         
         if (isInteractiveMode) {
           OpCode Code = PC->getOpCode();
-          std::cout << "Code is " << static_cast<int>(Code) << std::endl;
+          std::cout << "Code is " << std::hex << static_cast<int>(Code) << std::noshowbase << std::endl;
           InteractiveMode(breakpoint, PCSourceLoc);
           isInteractiveMode = false;
         }
