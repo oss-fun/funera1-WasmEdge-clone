@@ -172,8 +172,8 @@ public:
 
       // まだそのModInstを保存してなければ、dumpする
       if(!seenModInst[ModName]) {
-        ModInst->dumpMemInst(std::string(ModName));
-        ModInst->dumpGlobInst(std::string(ModName));
+        ModInst->dumpMemInst(fname_header + std::string(ModName));
+        ModInst->dumpGlobInst(fname_header + std::string(ModName));
         seenModInst[ModName] = true;
       }
       

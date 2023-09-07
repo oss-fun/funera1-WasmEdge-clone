@@ -332,90 +332,129 @@ public:
   // Migration functions
 
   // filename = meminst_{i}
-  Expect<void> dump(std::string filename) const noexcept {
-    std::ofstream dataPtrStream, memTypeStream;
+  Expect<void> dump(std::string filename) {
+    if (auto Res = dumpMemType(filename); !Res) {
+      return Unexpect(Res);
+    }
+    
+    if (auto Res = dumpDataPtr(filename); !Res) {
+      return Unexpect(Res);
+    }
 
+    return {};
+  }
+  
+  Expect<void> dumpMemType(std::string filename) {
     // Open file
-    std::string dataPtrFile = filename + "_dataptr.img";
-    std::string memTypeFile = filename + "_memtype.img";
-    dataPtrStream.open(dataPtrFile, std::ios::trunc | std::ios::binary);
-    memTypeStream.open(memTypeFile, std::ios::trunc);
+    filename = filename + "_memtype.img";
+    std::ofstream ofs(filename, std::ios::trunc);
+    if (!ofs) {
+      return Unexpect(ErrCode::Value::IllegalPath);
+    }
 
     // PageLimitをfileにdump
     uint32_t memLimit = MemType.getLimit().getMin();
-    memTypeStream << memLimit << std::endl;
-    memTypeStream.close();
+    ofs << memLimit << std::endl;
+    ofs.close();
+
+    return {};
+  }
+  
+  Expect<void> dumpDataPtr(std::string filename) {
+    // Open file
+    filename = filename + "_dataptr.img";
+    std::ofstream ofs(filename, std::ios::trunc | std::ios::binary);
+    if (!ofs) {
+      return Unexpect(ErrCode::Value::IllegalPath);
+    }
 
     // DataPtrをfileにdump
-    auto Res = getBytes(0, memLimit * kPageSize);
+    auto Res = getBytes(0, MemType.getLimit().getMin() * kPageSize);
     if (unlikely(!Res)) {
       return Unexpect(Res);
     }
     Span<Byte> Data = Res.value();
-    dataPtrStream.write((char*)&Data, Data.size()*sizeof(Data));
-    // dataPtrStream << Data;
-    // for (size_t i = 0; i < Data.size(); i++) {
-    //   dataPtrStream << *(Data.data() + i);
-    // }
-    dataPtrStream.close();
+    ofs.write(reinterpret_cast<char*>(Data.data()), Data.size());
+    ofs.close();
     return {};
   }
-
-  void restore(std::string filename) noexcept {
-    // restoreFileをparseする
-    std::ifstream dataPtrStream, memTypeStream;
-
-    // Restore DataPtr
-    std::string dataPtrFile = filename + "_dataptr.img";
-    dataPtrStream.open(dataPtrFile, std::ios::binary);
-    if (!dataPtrStream) {
-      std::cout << "\x1b[31m";
-      std::cout << "Error: Failed to open " << dataPtrFile << std::endl;
-      std::cout << "\x1b[m";
+  
+  
+  Expect<void> restore(std::string filename) noexcept {
+    if (auto Res = restoreDataPtr(filename)) {
+      Span<Byte> Byte = Res.value();
+      // TODO: setBytesをする際のgrowPageの兼ね合いとかどうなってるか確認する
+      setBytes(Byte, 0, 0, Byte.size());
     }
-
-    // TODO: DataPtrとPageLimitを読み取って、それぞれに代入する
-    Byte byte;
-    std::vector<Byte> byteVec(0);
-    int size = 0;
-    // while (dataPtrStream.read(&byte, sizeof(byte))) {
-    while(!dataPtrStream.eof()) {
-      dataPtrStream.read((char*)&byte, sizeof(byte));
-      byteVec.push_back(byte);
-      size++;
+    else {
+      return Unexpect(Res);
     }
-    setBytes(Span<Byte>(byteVec), 0, 0, size);
-
-    dataPtrStream.close();
     
-    // Restore MemType
-    std::string memTypeFile = filename + "_memtype.img";
-    memTypeStream.open(memTypeFile);
-    if (!memTypeStream) {
-      std::cout << "\x1b[31m";
-      std::cout << "Error: Failed to open " << memTypeFile << std::endl;
-      std::cout << "\x1b[m";
+    if (auto Res = restoreMemType(filename)) {
+      uint32_t memLimit = Res.value();
+      MemType.getLimit().setMin(memLimit);
     }
-    std::string memTypeString;
-    getline(memTypeStream, memTypeString);
-    memTypeStream.close();
+    else {
+      return Unexpect(Res);
+    }
+    
+    return {};
+  }
+  
+  Expect<uint32_t> restoreMemType(std::string filename) {
+    // Restore MemType
+    filename = filename + "_memtype.img";
+    std::ifstream ifs(filename);
+    if (!ifs) {
+      return Unexpect(ErrCode::Value::IllegalPath);
+    }
+
+    // TODO: バイナリで読み書きした方が良さそう
+    std::string memTypeStr;
+    getline(ifs, memTypeStr);
+    ifs.close();
 
     uint32_t memLimit;
     try {
-      memLimit = stoi(memTypeString);
+      memLimit = stoi(memTypeStr);
     } catch (const std::invalid_argument& e) {
       std::cout << "\x1b[31m";
-      std::cout << "Error: MemTypeString[" << memTypeString << "]: invalid argument" << std::endl;
+      std::cout << "Error: MemTypeString[" << memTypeStr << "]: invalid argument" << std::endl;
       std::cout << "\x1b[m";
-      // return Unexpect(ErrCode::Value::UserDefError);
+
+      return Unexpect(ErrCode::Value::InvalidConvToInt);
     } catch (const std::out_of_range& e) {
       std::cout << "\x1b[31m";
-      std::cout << "Error: MemTypeString[" << memTypeString << "]: out of range" << std::endl;
+      std::cout << "Error: MemTypeString[" << memTypeStr << "]: out of range" << std::endl;
       std::cout << "\x1b[m";
-      // return Unexpect(e);
-    }
-    MemType.getLimit().setMin(memLimit);
 
+      return Unexpect(ErrCode::Value::InvalidConvToInt);
+    }
+    return memLimit;
+  }
+  
+  Expect<Span<Byte>> restoreDataPtr(std::string filename) {
+    filename = filename + "_dataptr.img";
+    std::ifstream ifs(filename, std::ios::binary);
+    if (!ifs) {
+      return Unexpect(ErrCode::Value::IllegalPath);
+    }
+
+    // ファイルのサイズを取得
+    ifs.seekg(0, std::ios::end);
+    int length = ifs.tellg();
+    ifs.seekg(0, std::ios::beg);
+
+    uint8_t* data = new uint8_t[length];
+    ifs.read(reinterpret_cast<char*>(data), length);
+    if (!ifs) {
+      // static_assert(ifs, "dataptr.imgから読み込みが成功しなかった");      
+    }
+    ifs.close();
+    Span<Byte> bytes = Span<Byte>(&data[0], length);
+    delete data;
+
+    return bytes;
   }
 
 private:
