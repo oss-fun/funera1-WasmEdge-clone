@@ -381,6 +381,27 @@ public:
   
   
   Expect<void> restore(std::string filename) noexcept {
+    // Restore MemType
+    uint32_t oldPageSize = getPageSize();
+    uint32_t newPageSize;
+
+    if (auto Res = restoreMemType(filename)) {
+      newPageSize = Res.value();
+      // 新しいページサイズが前のページサイズを下回ることはないはず
+      // static_assert(newPageSize >= oldPageSize);
+
+      if (growPage(newPageSize - oldPageSize)) {
+        MemType.getLimit().setMin(newPageSize);
+      }
+      else {
+        return Unexpect(ErrCode::Value::Terminated);
+      }
+    }
+    else {
+      return Unexpect(Res);
+    }
+    
+    // Restore DataPtr
     if (auto Res = restoreDataPtr(filename)) {
       Span<Byte> Byte = Res.value();
       // TODO: setBytesをする際のgrowPageの兼ね合いとかどうなってるか確認する
@@ -390,13 +411,6 @@ public:
       return Unexpect(Res);
     }
     
-    if (auto Res = restoreMemType(filename)) {
-      uint32_t memLimit = Res.value();
-      MemType.getLimit().setMin(memLimit);
-    }
-    else {
-      return Unexpect(Res);
-    }
     
     return {};
   }
