@@ -13,6 +13,7 @@ namespace Executor {
 //   uint32_t FuncIdx;
 //   uint32_t Offset;
 // };
+Migrator Migr;
 
 std::vector<std::string> Split(std::string &s, char delim) {
   std::vector<std::string> elems;
@@ -35,7 +36,7 @@ void Help() {
     std::cout << "\033[1m" "break" " -- Making program stop at cerain point" "\x1b[0m" << std::endl;
 }
 
-void InteractiveMode(SourceLoc &bp, SourceLoc pc) {
+void InteractiveMode(SourceLoc &bp, SourceLoc pc, Runtime::StackManager &StackMgr) {
   std::string command;
   while(1) {
     std::cout << "\x1b[31m" << "wdb$ " << "\x1b[0m";
@@ -52,7 +53,7 @@ void InteractiveMode(SourceLoc &bp, SourceLoc pc) {
       bp.FuncIdx = stoi(commands[1]);
       bp.Offset = stoi(commands[2]);
     }
-    else if (commands[0] == "r" || commands[0] == "run") {
+    else if (commands[0] == "r" || commands[0] == "run" || commands[0] == "exit") {
         return;
     }
     else if (commands[0] == "ni" || commands[0] == "nexti") {
@@ -66,8 +67,12 @@ void InteractiveMode(SourceLoc &bp, SourceLoc pc) {
       if (commands[1] == "pc") {
         std::cout << "PC is " << pc.FuncIdx << " " << pc.Offset << std::endl;
       }
+      if (commands[1] == "frame") {
+        Migr.dumpStackMgrFrame(StackMgr, "debug_");
+      }
     }
     else if (commands[0] == "d" || commands[0] == "dump") {
+
     }
     else {
         Help();

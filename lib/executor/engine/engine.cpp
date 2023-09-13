@@ -1884,7 +1884,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
         if (isInteractiveMode) {
           OpCode Code = PC->getOpCode();
           std::cout << "Code is " << std::hex << static_cast<int>(Code) << std::noshowbase << std::endl;
-          InteractiveMode(breakpoint, PCSourceLoc);
+          InteractiveMode(breakpoint, PCSourceLoc, StackMgr);
           isInteractiveMode = false;
         }
       }
@@ -1903,6 +1903,9 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
 
      
     if (auto Res = Dispatch(); !Res) {
+      SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
+      std::cout << "[WASMEDGE ERROR] PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;
+      InteractiveMode(breakpoint, PCSourceLoc, StackMgr);
       return Unexpect(Res);
     }
     
