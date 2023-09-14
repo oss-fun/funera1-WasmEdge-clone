@@ -83,6 +83,12 @@ int Tool(struct DriverToolOptions &Opt) noexcept {
     Conf.getRuntimeConfigure().setMaxMemoryPage(
         static_cast<uint32_t>(Opt.MemLim.value().back()));
   }
+  if (Opt.RestoreFlag.value()) {
+    Conf.getStatisticsConfigure().setRestoreFlag(true);
+  }
+  if (Opt.DebugMode.value()) {
+    Conf.getStatisticsConfigure().setDebugMode(true);
+  }
   if (Opt.ConfEnableAllStatistics.value()) {
     Conf.getStatisticsConfigure().setInstructionCounting(true);
     Conf.getStatisticsConfigure().setCostMeasuring(true);

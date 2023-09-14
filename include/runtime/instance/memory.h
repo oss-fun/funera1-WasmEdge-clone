@@ -26,6 +26,7 @@
 #include <memory>
 #include <set>
 #include <utility>
+#include <iostream>
 
 namespace WasmEdge {
 namespace Runtime {
@@ -327,6 +328,148 @@ public:
   }
 
   uint8_t *getDataPtr() const noexcept { return DataPtr; }
+
+  // Migration functions
+
+  // filename = meminst_{i}
+  Expect<void> dump(std::string filename) {
+    if (auto Res = dumpMemType(filename); !Res) {
+      return Unexpect(Res);
+    }
+    
+    if (auto Res = dumpDataPtr(filename); !Res) {
+      return Unexpect(Res);
+    }
+
+    return {};
+  }
+  
+  Expect<void> dumpMemType(std::string filename) {
+    // Open file
+    filename = filename + "_memtype.img";
+    std::ofstream ofs(filename, std::ios::trunc);
+    if (!ofs) {
+      return Unexpect(ErrCode::Value::IllegalPath);
+    }
+
+    // PageLimitをfileにdump
+    uint32_t memLimit = MemType.getLimit().getMin();
+    ofs << memLimit << std::endl;
+    ofs.close();
+
+    return {};
+  }
+  
+  Expect<void> dumpDataPtr(std::string filename) {
+    // Open file
+    filename = filename + "_dataptr.img";
+    std::ofstream ofs(filename, std::ios::trunc | std::ios::binary);
+    if (!ofs) {
+      return Unexpect(ErrCode::Value::IllegalPath);
+    }
+
+    // DataPtrをfileにdump
+    auto Res = getBytes(0, MemType.getLimit().getMin() * kPageSize);
+    if (unlikely(!Res)) {
+      return Unexpect(Res);
+    }
+    Span<Byte> Data = Res.value();
+    ofs.write(reinterpret_cast<char*>(Data.data()), Data.size());
+    ofs.close();
+    return {};
+  }
+  
+  
+  Expect<void> restore(std::string filename) noexcept {
+    // Restore MemType
+    uint32_t oldPageSize = getPageSize();
+    uint32_t newPageSize;
+
+    if (auto Res = restoreMemType(filename)) {
+      newPageSize = Res.value();
+      // 新しいページサイズが前のページサイズを下回ることはないはず
+      // static_assert(newPageSize >= oldPageSize);
+
+      if (growPage(newPageSize - oldPageSize)) {
+        MemType.getLimit().setMin(newPageSize);
+      }
+      else {
+        return Unexpect(ErrCode::Value::Terminated);
+      }
+    }
+    else {
+      return Unexpect(Res);
+    }
+    
+    // Restore DataPtr
+    if (auto Res = restoreDataPtr(filename)) {
+      Span<Byte> Byte = Res.value();
+      // TODO: setBytesをする際のgrowPageの兼ね合いとかどうなってるか確認する
+      setBytes(Byte, 0, 0, Byte.size());
+    }
+    else {
+      return Unexpect(Res);
+    }
+    
+    
+    return {};
+  }
+  
+  Expect<uint32_t> restoreMemType(std::string filename) {
+    // Restore MemType
+    filename = filename + "_memtype.img";
+    std::ifstream ifs(filename);
+    if (!ifs) {
+      return Unexpect(ErrCode::Value::IllegalPath);
+    }
+
+    // TODO: バイナリで読み書きした方が良さそう
+    std::string memTypeStr;
+    getline(ifs, memTypeStr);
+    ifs.close();
+
+    uint32_t memLimit;
+    try {
+      memLimit = stoi(memTypeStr);
+    } catch (const std::invalid_argument& e) {
+      std::cout << "\x1b[31m";
+      std::cout << "Error: MemTypeString[" << memTypeStr << "]: invalid argument" << std::endl;
+      std::cout << "\x1b[m";
+
+      return Unexpect(ErrCode::Value::InvalidConvToInt);
+    } catch (const std::out_of_range& e) {
+      std::cout << "\x1b[31m";
+      std::cout << "Error: MemTypeString[" << memTypeStr << "]: out of range" << std::endl;
+      std::cout << "\x1b[m";
+
+      return Unexpect(ErrCode::Value::InvalidConvToInt);
+    }
+    return memLimit;
+  }
+  
+  Expect<Span<Byte>> restoreDataPtr(std::string filename) {
+    filename = filename + "_dataptr.img";
+    std::ifstream ifs(filename, std::ios::binary);
+    if (!ifs) {
+      return Unexpect(ErrCode::Value::IllegalPath);
+    }
+
+    // ファイルのサイズを取得
+    ifs.seekg(0, std::ios::end);
+    int length = ifs.tellg();
+    ifs.seekg(0, std::ios::beg);
+
+    uint8_t* data = new uint8_t[length];
+    ifs.read(reinterpret_cast<char*>(data), length);
+    if (!ifs) {
+      // static_assert(ifs, "dataptr.imgから読み込みが成功しなかった");      
+    }
+    ifs.close();
+    Span<Byte> bytes = Span<Byte>(&data[0], length);
+    delete data;
+
+    return bytes;
+  }
 
 private:
   /// \name Data of memory instance.

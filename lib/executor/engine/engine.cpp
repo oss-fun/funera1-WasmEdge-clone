@@ -2,13 +2,27 @@
 // SPDX-FileCopyrightText: 2019-2022 Second State INC
 
 #include "executor/executor.h"
+#include "./debugger.cpp"
 
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <signal.h>
 
 namespace WasmEdge {
 namespace Executor {
+
+bool DumpFlag;
+bool restoreTestFlag = true;
+bool isInteractiveMode = true;
+SourceLoc breakpoint;
+
+// TODO: signumの処理無駄なのでどうにかする
+void signalHandler(int signum) {
+  if (signum)
+    DumpFlag = true;
+  DumpFlag = true;
+}
 
 Expect<void> Executor::runExpression(Runtime::StackManager &StackMgr,
                                      AST::InstrView Instrs) {
@@ -46,13 +60,38 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
       return Unexpect(GetIt);
     }
   }
+
   if (Res) {
+    Migr.preDumpIter(Func.getModule());
+
+    // Restore
+    if (RestoreFlag && Conf.getStatisticsConfigure().getRestoreFlag()) {
+      std::cout << "### Restore! ###" << std::endl;
+      auto Res = Migr.restoreIter(Func.getModule());
+      if (!Res) {
+        return Unexpect(Res);
+      }
+      StartIt = Res.value();
+      std::cout << "Success to restore iter" << std::endl;
+
+      StackMgr = Migr.restoreStackMgr().value();
+      std::cout << "Success to restore stack" << std::endl;
+      
+      /// restoreしたものが元のものと一致するかtest
+      Migr.dumpIter(StartIt, "restored_");
+      Migr.dumpStackMgrFrame(StackMgr, "restored_");
+      Migr.dumpStackMgrValue(StackMgr, "restored_");
+      std::cout << "Success to dump restore file" << std::endl;
+
+      RestoreFlag = false;
+    }
+  
     // If not terminated, execute the instructions in interpreter mode.
     // For the entering AOT or host functions, the `StartIt` is equal to the end
     // of instruction list, therefore the execution will return immediately.
     Res = execute(StackMgr, StartIt, Func.getInstrs().end());
   }
-
+  
   if (Res) {
     spdlog::debug(" Execution succeeded.");
   } else if (Res.error() == ErrCode::Value::Terminated) {
@@ -1811,6 +1850,11 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     }
   };
 
+  // signal handler
+  signal(SIGINT, &signalHandler);
+
+  int cnt = 0;
+
   while (PC != PCEnd) {
     if (Stat) {
       OpCode Code = PC->getOpCode();
@@ -1826,14 +1870,52 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
           return Unexpect(ErrCode::Value::CostLimitExceeded);
         }
       }
+      
+      if (isInteractiveMode && Conf.getStatisticsConfigure().getDebugMode()) {
+        // DebugMode
+        // PCのsource locationとbreakで与えられたsource locationが一致するか判定し、一致する場合、isInteractiveMode = trueにする
+        // source locationはとりあえず(func_idx, offset)とする
+        SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
+        std::cout << "PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;
+        if (PCSourceLoc == breakpoint) {
+          isInteractiveMode = true;
+        }
+        
+        if (isInteractiveMode) {
+          OpCode Code = PC->getOpCode();
+          std::cout << "Code is " << std::hex << static_cast<int>(Code) << std::noshowbase << std::endl;
+          InteractiveMode(breakpoint, PCSourceLoc, StackMgr);
+          isInteractiveMode = false;
+        }
+      }
     }
+
+    if (DumpFlag) {
+      Migr.dumpIter(PC);
+      std::cout << "Success dumpIter" << std::endl;
+      Migr.dumpStackMgrFrame(StackMgr);
+      std::cout << "Success dumpStackMgrFrame" << std::endl;
+      Migr.dumpStackMgrValue(StackMgr);
+      std::cout << "Success dumpStackMgrValue" << std::endl;
+      // TODO: 途中で止まったことがわかるエラーを返す
+      return {};
+    }
+
+     
     if (auto Res = Dispatch(); !Res) {
+      SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
+      std::cout << "[WASMEDGE ERROR] PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;
+      InteractiveMode(breakpoint, PCSourceLoc, StackMgr);
       return Unexpect(Res);
     }
+    
     PC++;
+    cnt++;
   }
   return {};
 }
+
+
 
 } // namespace Executor
 } // namespace WasmEdge

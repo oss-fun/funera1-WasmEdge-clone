@@ -15,6 +15,7 @@
 
 #include "ast/instruction.h"
 #include "runtime/instance/module.h"
+// #include "executor/migrator.h"
 
 #include <vector>
 
@@ -138,6 +139,21 @@ public:
     FrameStack.clear();
   }
 
+  // TODO: protectedとかつける
+  std::vector<Frame> getFrameStack() {
+    return FrameStack;
+  }
+  std::vector<Value> getValueStack() {
+    return ValueStack;
+  }
+  
+  void setFrameStack(std::vector<Frame> fs) {
+    FrameStack = fs;
+  }
+  void setValueStack(std::vector<Value> vs) {
+    ValueStack = vs;
+  }
+  
 private:
   /// \name Data of stack manager.
   /// @{

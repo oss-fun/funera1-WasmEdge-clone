@@ -38,6 +38,7 @@ namespace WasmEdge {
 
 namespace Executor {
 class Executor;
+class Migrator;
 }
 
 namespace Runtime {
@@ -179,8 +180,53 @@ public:
     return std::forward<CallbackT>(CallBack)(ExpGlobals);
   }
 
+  // Migration function
+  void dumpMemInst(std::string name) const noexcept {
+    // std::unique_lock Lock(Mutex);
+    // MemoryInstanceの保存
+    for (uint32_t I = 0; I < getMemoryNum(); ++I) {
+        auto Res = getMemory(I);
+        MemoryInstance* MemInst = Res.value();
+        MemInst->dump(name + "_meminst_" + std::to_string(I));
+    }
+  }
+
+  void restoreMemInst(std::string name) const noexcept {
+    // std::unique_lock Lock(Mutex);
+    assert(MemInsts);
+
+    for (uint32_t I = 0; I < getMemoryNum(); ++I) {
+      auto Res = getMemory(I);
+      MemoryInstance* MemInst = Res.value();
+      MemInst->restore(name + "_meminst_" + std::to_string(I));
+    }
+  }
+  
+  void dumpGlobInst(std::string name) const noexcept {
+    // std::unique_lock Lock(Mutex);
+    // GlobalInstanceの保存
+    for (uint32_t I = 0; I < getGlobalNum(); ++I) {
+        auto Res = getGlobal(I);
+        GlobalInstance* GlobInst = Res.value();
+        GlobInst->dump(name + "_globinst_" + std::to_string(I));
+    }
+  }
+
+  void restoreGlobInst(std::string name) const noexcept {
+    // std::unique_lock Lock(Mutex);
+    for (uint32_t I = 0; I < getGlobalNum(); ++I) {
+        auto Res = getGlobal(I);
+        GlobalInstance* GlobInst = Res.value();
+        GlobInst->restore(name + "_globinst_" + std::to_string(I));
+    }
+  }
+
+  // void restore(std::ifstream &restoreFile) const noexcept {
+  // }
+
 protected:
   friend class Executor::Executor;
+  friend class Executor::Migrator;
   friend class Runtime::CallingFrame;
 
   /// Copy the function types in type section to this module instance.

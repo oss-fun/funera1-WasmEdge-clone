@@ -24,6 +24,7 @@
 #include "runtime/instance/module.h"
 #include "runtime/stackmgr.h"
 #include "runtime/storemgr.h"
+#include "executor/migrator.h"
 
 #include <atomic>
 #include <condition_variable>
@@ -87,6 +88,7 @@ using TypeNN =
                               Expect<void>>;
 
 } // namespace
+
 
 /// Executor flow control class.
 class Executor {
@@ -688,6 +690,13 @@ private:
   Statistics::Statistics *Stat;
   /// Stop Execution
   std::atomic_uint32_t StopToken = 0;
+  /// Migrator
+  Migrator Migr;
+  bool RestoreFlag = true;
+  Runtime::StoreManager StoreMgr;
+public:
+  void setStoreMgrToMigr(Runtime::StoreManager& StoreMgr) { Migr.NamedMod = StoreMgr.NamedMod; }
+
 };
 
 } // namespace Executor

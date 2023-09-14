@@ -70,6 +70,7 @@ struct DriverToolOptions {
             "Enable generating code for all statistics options include instruction counting, gas measuring, and execution time"sv)),
         ConfForceInterpreter(
             PO::Description("Forcibly run WASM in interpreter mode."sv)),
+        RestoreFlag(PO::Description("Resotre statement by img files."sv)),
         TimeLim(
             PO::Description(
                 "Limitation of maximum time(in milliseconds) for execution, default value is 0 for no limitations"sv),
@@ -107,6 +108,8 @@ struct DriverToolOptions {
   PO::Option<PO::Toggle> ConfEnableTimeMeasuring;
   PO::Option<PO::Toggle> ConfEnableAllStatistics;
   PO::Option<PO::Toggle> ConfForceInterpreter;
+  PO::Option<PO::Toggle> RestoreFlag;
+  PO::Option<PO::Toggle> DebugMode;
   PO::Option<uint64_t> TimeLim;
   PO::List<int> GasLim;
   PO::List<int> MemLim;
@@ -136,6 +139,8 @@ struct DriverToolOptions {
         .add_option("enable-extended-const"sv, PropExtendConst)
         .add_option("enable-threads"sv, PropThreads)
         .add_option("enable-all"sv, PropAll)
+        .add_option("restore-flag"sv, RestoreFlag)
+        .add_option("debug-mode"sv, DebugMode)
         .add_option("time-limit"sv, TimeLim)
         .add_option("gas-limit"sv, GasLim)
         .add_option("memory-page-limit"sv, MemLim)
