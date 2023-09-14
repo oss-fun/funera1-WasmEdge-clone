@@ -182,6 +182,7 @@ public:
 
   // Migration function
   void dumpMemInst(std::string name) const noexcept {
+    // std::unique_lock Lock(Mutex);
     // MemoryInstanceの保存
     for (uint32_t I = 0; I < getMemoryNum(); ++I) {
         auto Res = getMemory(I);
@@ -191,6 +192,7 @@ public:
   }
 
   void restoreMemInst(std::string name) const noexcept {
+    // std::unique_lock Lock(Mutex);
     assert(MemInsts);
 
     for (uint32_t I = 0; I < getMemoryNum(); ++I) {
@@ -201,6 +203,7 @@ public:
   }
   
   void dumpGlobInst(std::string name) const noexcept {
+    // std::unique_lock Lock(Mutex);
     // GlobalInstanceの保存
     for (uint32_t I = 0; I < getGlobalNum(); ++I) {
         auto Res = getGlobal(I);
@@ -210,6 +213,7 @@ public:
   }
 
   void restoreGlobInst(std::string name) const noexcept {
+    // std::unique_lock Lock(Mutex);
     for (uint32_t I = 0; I < getGlobalNum(); ++I) {
         auto Res = getGlobal(I);
         GlobalInstance* GlobInst = Res.value();

@@ -86,6 +86,9 @@ int Tool(struct DriverToolOptions &Opt) noexcept {
   if (Opt.RestoreFlag.value()) {
     Conf.getStatisticsConfigure().setRestoreFlag(true);
   }
+  if (Opt.DebugMode.value()) {
+    Conf.getStatisticsConfigure().setDebugMode(true);
+  }
   if (Opt.ConfEnableAllStatistics.value()) {
     Conf.getStatisticsConfigure().setInstructionCounting(true);
     Conf.getStatisticsConfigure().setCostMeasuring(true);

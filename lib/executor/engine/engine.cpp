@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2019-2022 Second State INC
 
 #include "executor/executor.h"
+#include "./debugger.cpp"
 
 #include <array>
 #include <cstdint>
@@ -13,6 +14,9 @@ namespace Executor {
 
 bool DumpFlag;
 bool restoreTestFlag = true;
+bool isInteractiveMode = true;
+SourceLoc breakpoint;
+
 // TODO: signumの処理無駄なのでどうにかする
 void signalHandler(int signum) {
   if (signum)
@@ -63,16 +67,21 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
     // Restore
     if (RestoreFlag && Conf.getStatisticsConfigure().getRestoreFlag()) {
       std::cout << "### Restore! ###" << std::endl;
-      StartIt = Migr.restoreIter(Func.getModule());
-      StackMgr = Migr.restoreStackMgr();
+      auto Res = Migr.restoreIter(Func.getModule());
+      if (!Res) {
+        return Unexpect(Res);
+      }
+      StartIt = Res.value();
+      std::cout << "Success to restore iter" << std::endl;
+
+      StackMgr = Migr.restoreStackMgr().value();
+      std::cout << "Success to restore stack" << std::endl;
       
       /// restoreしたものが元のものと一致するかtest
       Migr.dumpIter(StartIt, "restored_");
-      std::cout << "Success dumpIter" << std::endl;
       Migr.dumpStackMgrFrame(StackMgr, "restored_");
-      std::cout << "Success dumpStackMgrFrame" << std::endl;
       Migr.dumpStackMgrValue(StackMgr, "restored_");
-      std::cout << "Success dumpStackMgrValue" << std::endl;
+      std::cout << "Success to dump restore file" << std::endl;
 
       RestoreFlag = false;
     }
@@ -1845,29 +1854,8 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
   signal(SIGINT, &signalHandler);
 
   int cnt = 0;
+
   while (PC != PCEnd) {
-    // restoreした場合に、restoreした直後にdumpしたimgファイルと、restore元のimgファイルは一致することを確認するもの
-    // if (restoreTestFlag && Conf.getStatisticsConfigure().getRestoreFlag()) {
-    //   Migr.dumpIter(PC, "restored_");
-    //   std::cout << "Success dumpIter" << std::endl;
-    //   Migr.dumpStackMgrFrame(StackMgr, "restored_");
-    //   std::cout << "Success dumpStackMgrFrame" << std::endl;
-    //   Migr.dumpStackMgrValue(StackMgr, "restored_");
-    //   std::cout << "Success dumpStackMgrValue" << std::endl;
-    //   restoreTestFlag = false;
-    // }
-
-    if (DumpFlag) {
-      Migr.dumpIter(PC);
-      std::cout << "Success dumpIter" << std::endl;
-      Migr.dumpStackMgrFrame(StackMgr);
-      std::cout << "Success dumpStackMgrFrame" << std::endl;
-      Migr.dumpStackMgrValue(StackMgr);
-      std::cout << "Success dumpStackMgrValue" << std::endl;
-      // TODO: 途中で止まったことがわかるエラーを返す
-      return {};
-    }
-
     if (Stat) {
       OpCode Code = PC->getOpCode();
       if (Conf.getStatisticsConfigure().isInstructionCounting()) {
@@ -1882,34 +1870,42 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
           return Unexpect(ErrCode::Value::CostLimitExceeded);
         }
       }
-    }
-    
-    std::string command;
-    while(1) {
-      OpCode Code = PC->getOpCode();
-      std::cout << cnt << " " << Code << std::endl;
-      std::cin >> command;
-
-      // 表示する横の長さ
-      // const int a = 28;
-
-      if (command == "info stack" || command == "i s") {
-        int size = StackMgr.size();
-        auto stack = StackMgr.getTopN(size);
-
-        std::cout << "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓";
-        for (int i = size-1; i >= 0; i++) {
-          std::cout << "┃  " << StackMgr.getTopN(i) << "  ┃" << std::endl;
-          std::cout << "┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫";
-        }  
-        std::cout << "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛";
-      }
-      else {
-        break;
+      
+      if (isInteractiveMode && Conf.getStatisticsConfigure().getDebugMode()) {
+        // DebugMode
+        // PCのsource locationとbreakで与えられたsource locationが一致するか判定し、一致する場合、isInteractiveMode = trueにする
+        // source locationはとりあえず(func_idx, offset)とする
+        SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
+        std::cout << "PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;
+        if (PCSourceLoc == breakpoint) {
+          isInteractiveMode = true;
+        }
+        
+        if (isInteractiveMode) {
+          OpCode Code = PC->getOpCode();
+          std::cout << "Code is " << std::hex << static_cast<int>(Code) << std::noshowbase << std::endl;
+          InteractiveMode(breakpoint, PCSourceLoc, StackMgr);
+          isInteractiveMode = false;
+        }
       }
     }
+
+    if (DumpFlag) {
+      Migr.dumpIter(PC);
+      std::cout << "Success dumpIter" << std::endl;
+      Migr.dumpStackMgrFrame(StackMgr);
+      std::cout << "Success dumpStackMgrFrame" << std::endl;
+      Migr.dumpStackMgrValue(StackMgr);
+      std::cout << "Success dumpStackMgrValue" << std::endl;
+      // TODO: 途中で止まったことがわかるエラーを返す
+      return {};
+    }
+
      
     if (auto Res = Dispatch(); !Res) {
+      SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
+      std::cout << "[WASMEDGE ERROR] PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;
+      InteractiveMode(breakpoint, PCSourceLoc, StackMgr);
       return Unexpect(Res);
     }
     
@@ -1918,6 +1914,8 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
   }
   return {};
 }
+
+
 
 } // namespace Executor
 } // namespace WasmEdge

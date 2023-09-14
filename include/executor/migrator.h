@@ -20,16 +20,20 @@ namespace Runtime {
 }
 
 namespace Executor {
+struct SourceLoc {
+  bool operator==(const SourceLoc& rhs) const {
+    return (FuncIdx == rhs.FuncIdx && Offset == rhs.Offset);
+  }
+
+  uint32_t FuncIdx;
+  uint32_t Offset;
+};
 
 class Migrator {
 public:
-  struct IterData {
-    uint32_t FuncIdx;
-    uint32_t Offset;
-  };
   /// TODO: ModuleInstanceがnullだったときの名前。重複しないようにする
   const std::string NULL_MOD_NAME = "null";
-  using IterMigratorType = std::map<AST::InstrView::iterator, IterData>;
+  using IterMigratorType = std::map<AST::InstrView::iterator, SourceLoc>;
 
   /// ================
   /// Interface
@@ -71,7 +75,7 @@ public:
       
       uint32_t Offset = 0;
       while (PC != PCEnd) {
-        IterMigrator[PC] = {I, Offset};
+        IterMigrator[PC] = SourceLoc{I, Offset};
         Offset++;
         PC++;
       }
@@ -97,6 +101,14 @@ public:
       IterMigratorType I;
       return I;
     }
+  }
+
+  SourceLoc getSourceLoc(AST::InstrView::iterator Iter) {
+    IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
+    assert(IterMigrator);
+
+    struct SourceLoc Data = IterMigrator[Iter];
+    return Data;
   }
   
   uint128_t stou128(std::string s) {
@@ -126,7 +138,7 @@ public:
     IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
     assert(IterMigrator);
 
-    struct IterData Data = IterMigrator[Iter];
+    struct SourceLoc Data = IterMigrator[Iter];
     std::ofstream iterStream;
     iterStream.open(fname_header + "iter.img", std::ios::trunc);
 
@@ -160,14 +172,14 @@ public:
 
       // まだそのModInstを保存してなければ、dumpする
       if(!seenModInst[ModName]) {
-        ModInst->dumpMemInst(std::string(ModName));
-        ModInst->dumpGlobInst(std::string(ModName));
+        ModInst->dumpMemInst(fname_header + std::string(ModName));
+        ModInst->dumpGlobInst(fname_header + std::string(ModName));
         seenModInst[ModName] = true;
       }
       
       // Iterator
       IterMigratorType IterMigrator = getIterMigrator(ModInst);
-      struct IterData Data = IterMigrator[const_cast<AST::InstrView::iterator>(f.From)];
+      struct SourceLoc Data = IterMigrator[const_cast<AST::InstrView::iterator>(f.From)];
       FrameStream << Data.FuncIdx << std::endl;
       FrameStream << Data.Offset << std::endl;
 
@@ -198,10 +210,17 @@ public:
   /// ================
   /// Restore functions
   /// ================
-  AST::InstrView::iterator _restoreIter(const Runtime::Instance::ModuleInstance* ModInst, uint32_t FuncIdx, uint32_t Offset) {
+  Expect<AST::InstrView::iterator> _restoreIter(const Runtime::Instance::ModuleInstance* ModInst, uint32_t FuncIdx, uint32_t Offset) {
     assert(ModInst != nullptr);
     
     auto Res = ModInst->getFunc(FuncIdx);
+    if (unlikely(!Res)) {
+      // spdlog::error(ErrInfo::InfoAST(ASTNodeAttr::Seg_Element));
+      std::cout << "\x1b[31m";
+      std::cout << "ERROR: _restoreIter" << std::endl;
+      std::cout << "\x1b[1m";
+      return Unexpect(Res);
+    }
     Runtime::Instance::FunctionInstance* FuncInst = Res.value();
     assert(FuncInst != nullptr);
 
@@ -214,29 +233,58 @@ public:
     return Iter;
   }
 
-  AST::InstrView::iterator restoreIter(const Runtime::Instance::ModuleInstance* ModInst) {
+  Expect<AST::InstrView::iterator> restoreIter(const Runtime::Instance::ModuleInstance* ModInst) {
     std::ifstream iterStream;
     iterStream.open("iter.img");
     
     std::string iterString;
+    uint32_t FuncIdx, Offset;
     // FuncIdx
     getline(iterStream, iterString);
-    uint32_t FuncIdx = static_cast<uint32_t>(std::stoul(iterString));
+    try {
+      FuncIdx = static_cast<uint32_t>(std::stoul(iterString));
+    } catch (const std::invalid_argument& e) {
+      std::cout << "\x1b[31m";
+      std::cout << "FuncIdx[" << iterString << "]: invalid argument" << std::endl;
+      std::cout << "\x1b[m";
+      // return Unexpect(ErrCode::Value::UserDefError);
+    } catch (const std::out_of_range& e) {
+      std::cout << "\x1b[31m";
+      std::cout << "FuncIdx[" << iterString << "]: out of range" << std::endl;
+      std::cout << "\x1b[m";
+      // return Unexpect(e);
+    }
     // Offset
     getline(iterStream, iterString);
-    uint32_t Offset = static_cast<uint32_t>(std::stoul(iterString));
+    try {
+      Offset = static_cast<uint32_t>(std::stoul(iterString));
+    } catch (const std::invalid_argument& e) {
+      std::cout << "\x1b[31m";
+      std::cout << "Offset[" << iterString << "]: invalid argument" << std::endl;
+      std::cout << "\x1b[m";
+      // return Unexpect(e);
+    } catch (const std::out_of_range& e) {
+      std::cout << "\x1b[31m";
+      std::cout << "Offset[" << iterString << "]: out of range" << std::endl;
+      std::cout << "\x1b[m";
+      // return Unexpect(e);
+    }
 
     iterStream.close();
 
     // std::cout << FuncIdx << " " << Offset << std::endl;
     
     // FuncIdxとOffsetからitertorを復元
-    auto Iter = _restoreIter(ModInst, FuncIdx, Offset);
-    // std::cout << "Success to restore iter" << std::endl;
+    auto Res = _restoreIter(ModInst, FuncIdx, Offset);
+    if (!Res) {
+      return Unexpect(Res);
+    }
+
+    auto Iter = Res.value();
     return Iter;
   }
   
-  std::vector<Runtime::StackManager::Frame> restoreStackMgrFrame() {
+  Expect<std::vector<Runtime::StackManager::Frame>> restoreStackMgrFrame() {
     std::ifstream FrameStream;
     FrameStream.open("stackmgr_frame.img");
     Runtime::StackManager StackMgr;
@@ -245,6 +293,7 @@ public:
     FrameStack.reserve(16U);
     std::string FrameString;
     /// TODO: ループ条件見直す
+    std::map<std::string, const Runtime::Instance::ModuleInstance*> ModCache;
     while(getline(FrameStream, FrameString)) {
       // ModuleInstance
       std::string ModName = FrameString;
@@ -253,9 +302,6 @@ public:
 
       // ModInstがnullの場合
       if (ModName == NULL_MOD_NAME) {
-        // AST::InstrView::iterator From;
-        // uint32_t Locals, VPos, Arity;
-
         Runtime::StackManager::Frame f(nullptr, nullptr, 0, 0, 0);
         FrameStack.push_back(f);
 
@@ -276,10 +322,16 @@ public:
       // std::cout << "restore frame: 2" << std::endl;
 
       /// TODO: 同じModuleの復元をしないよう、キャッシュを作る
-      if (1) {
+      if (ModCache.count(ModName) == 0) {
         // std::cout << ModInst->getMemoryNum() << std::endl;
         ModInst->restoreMemInst(std::string(ModName));
+        // std::cout << "Success restore meminst" << std::endl;
         ModInst->restoreGlobInst(std::string(ModName));
+        // std::cout << "Success restore globinst" << std::endl;
+        ModCache[ModName] = ModInst;
+      }
+      else {
+        ModInst = ModCache[ModName];
       }
       // std::cout << "restore frame: 3" << std::endl;
 
@@ -288,7 +340,12 @@ public:
       uint32_t FuncIdx = static_cast<uint32_t>(std::stoul(FrameString));
       getline(FrameStream, FrameString);
       uint32_t Offset = static_cast<uint32_t>(std::stoul(FrameString));
-      AST::InstrView::iterator From = _restoreIter(ModInst, FuncIdx, Offset);
+      auto Res = _restoreIter(ModInst, FuncIdx, Offset);
+      if (!Res) {
+        return Unexpect(Res);
+      }
+      AST::InstrView::iterator From = Res.value();
+      // AST::InstrView::iterator From = _restoreIter(ModInst, FuncIdx, Offset).value();
       // std::cout << "restore frame: 4" << std::endl;
 
       // Locals, VPos, Arity
@@ -311,7 +368,7 @@ public:
     return FrameStack;
   }
   
-  std::vector<Runtime::StackManager::Value> restoreStackMgrValue() {	  // Runtime::StackManager restoreStackMgr() {
+  Expect<std::vector<Runtime::StackManager::Value>> restoreStackMgrValue() {	  // Runtime::StackManager restoreStackMgr() {
     std::ifstream ValueStream;	  // }
     ValueStream.open("stackmgr_value.img");	
     Runtime::StackManager StackMgr;	
@@ -338,16 +395,25 @@ public:
     return ValueStack;    	
   }
 
-  Runtime::StackManager restoreStackMgr() {
-    std::vector<Runtime::StackManager::Frame> fs = restoreStackMgrFrame();
-    // std::cout << "Success to restore stack frame" << std::endl;
-    std::vector<Runtime::StackManager::Value> vs = restoreStackMgrValue();
-    // std::cout << "Success to restore stack value" << std::endl;
+  Expect<Runtime::StackManager> restoreStackMgr() {
+    // auto Res = restoreStackMgrFrame().value;
+    // if (!Res) {
+    //   // return Unexpect(Res);
+    // }
+    std::vector<Runtime::StackManager::Frame> fs = restoreStackMgrFrame().value();
+    std::cout << "Success to restore stack frame" << std::endl;
+
+    // Res = restoreStackMgrValue();
+    // if (!Res) {
+    //   return Unexpect(Res);
+    // }
+    std::vector<Runtime::StackManager::Value> vs = restoreStackMgrValue().value();
+    std::cout << "Success to restore stack value" << std::endl;
 
     Runtime::StackManager StackMgr;
     StackMgr.setFrameStack(fs);
     StackMgr.setValueStack(vs);
-    // std::cout << "Success to restore stack manager" << std::endl;
+    std::cout << "Success to restore stack manager" << std::endl;
 
     return StackMgr;
   }
