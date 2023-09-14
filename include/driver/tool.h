@@ -70,7 +70,7 @@ struct DriverToolOptions {
             "Enable generating code for all statistics options include instruction counting, gas measuring, and execution time"sv)),
         ConfForceInterpreter(
             PO::Description("Forcibly run WASM in interpreter mode."sv)),
-        RestoreFlag(PO::Description("Resotre statement by img files."sv)),
+        RestoreFlag(PO::Description("Restore statement by img files."sv)),
         TimeLim(
             PO::Description(
                 "Limitation of maximum time(in milliseconds) for execution, default value is 0 for no limitations"sv),
