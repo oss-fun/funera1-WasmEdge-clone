@@ -24,7 +24,7 @@ jobs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Get version
         id: prep
         run: |
@@ -106,7 +106,7 @@ jobs:
       image: wasmedge/wasmedge:ubuntu-20.04-build-clang
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Grant the safe directory for git
@@ -180,7 +180,7 @@ jobs:
       image: wasmedge/wasmedge:ubuntu-20.04-build-clang
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Grant the safe directory for git
@@ -287,7 +287,7 @@ jobs:
       image: wasmedge/wasmedge:${{ matrix.docker_tag }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Grant the safe directory for git
@@ -359,7 +359,7 @@ jobs:
       image: wasmedge/wasmedge:${{ matrix.docker_tag }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Grant the safe directory for git
@@ -460,7 +460,7 @@ jobs:
     needs: create_release
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Grant the safe directory for git
@@ -535,7 +535,7 @@ jobs:
       image: wasmedge/wasmedge:manylinux2014_x86_64
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Grant the safe directory for git
         run: |
           git config --global --add safe.directory $(pwd)
@@ -575,7 +575,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Prepare tarball
         uses: actions/download-artifact@v3
         with:
