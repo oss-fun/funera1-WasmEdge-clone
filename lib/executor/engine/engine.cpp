@@ -1855,7 +1855,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
 
   int cnt = 0;
   int dispatch_count = 0;
-  int dispatch_limit = 10000;
+  int dispatch_limit = -1;
 
   while (PC != PCEnd) {
     dispatch_count++;
