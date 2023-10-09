@@ -127,7 +127,7 @@ public:
   
   void debugFuncOpcode(uint32_t FuncIdx, uint32_t Offset, AST::InstrView::iterator it) {
     std::ofstream opcodeLog;
-    opcodeLog.open("wasmedge_opcode.log", st::ios::app);
+    opcodeLog.open("wasmedge_opcode.log", std::ios::app);
     opcodeLog << "fidx: " << FuncIdx << "\n";
     for (uint32_t i = 0; i < Offset; i++) it--;
     for (uint32_t i = 0; i < Offset; i++) {
