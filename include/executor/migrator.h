@@ -125,6 +125,18 @@ public:
     return ret;
   }
   
+  void debugFuncOpcode(uint32_t FuncIdx, uint32_t Offset, AST::InstrView::iterator it) {
+    std::ofstream opcodeLog;
+    opcodeLog.open("wasmedge_opcode.log", st::ios::app);
+    opcodeLog << "fidx: " << FuncIdx << "\n";
+    for (uint32_t i = 0; i < Offset; i++) it--;
+    for (uint32_t i = 0; i < Offset; i++) {
+      opcodeLog << i+1 << ") opcode: 0x" << std::hex << static_cast<uint16_t>(it->getOpCode()) << "\n";
+      opcodeLog << std::dec;
+      it++;
+    }
+  }
+
   /// ================
   /// Dump functions
   /// ================
@@ -142,6 +154,7 @@ public:
     std::ofstream iterStream;
     iterStream.open(fname_header + "iter.img", std::ios::trunc);
 
+    debugFuncOpcode(Data.FuncIdx, Data.Offset, Iter);
     iterStream << Data.FuncIdx << std::endl;
     iterStream << Data.Offset;
       
@@ -180,6 +193,8 @@ public:
       // Iterator
       IterMigratorType IterMigrator = getIterMigrator(ModInst);
       struct SourceLoc Data = IterMigrator[const_cast<AST::InstrView::iterator>(f.From)];
+      debugFuncOpcode(Data.FuncIdx, Data.Offset, f.From);
+
       FrameStream << Data.FuncIdx << std::endl;
       FrameStream << Data.Offset << std::endl;
 

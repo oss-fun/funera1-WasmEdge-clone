@@ -1854,8 +1854,14 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
   signal(SIGINT, &signalHandler);
 
   int cnt = 0;
+  int dispatch_count = 0;
+  int dispatch_limit = 10000;
 
   while (PC != PCEnd) {
+    dispatch_count++;
+    if (dispatch_count == dispatch_limit)
+      DumpFlag = true;
+
     if (Stat) {
       OpCode Code = PC->getOpCode();
       if (Conf.getStatisticsConfigure().isInstructionCounting()) {
