@@ -43,6 +43,7 @@ public:
   /// unexpect operations will occur.
   StackManager() noexcept {
     ValueStack.reserve(2048U);
+    TypeStack.reserve(2048U);
     FrameStack.reserve(16U);
   }
   ~StackManager() = default;
@@ -67,12 +68,17 @@ public:
   /// Push a new value entry to stack.
   template <typename T> void push(T &&Val) {
     ValueStack.push_back(std::forward<T>(Val));
+    // 32bitなら0, 64bitなら1
+    if (sizeof(T) == 4) TypeStack.push_back(0);
+    else if (sizeof(T) == 8) TypeStack.push_back(1);
+    else TypeStack.push_back(2);
   }
 
   /// Unsafe Pop and return the top entry.
   Value pop() {
     Value V = std::move(ValueStack.back());
     ValueStack.pop_back();
+    TypeStack.pop_back();
     return V;
   }
 
@@ -146,6 +152,9 @@ public:
   std::vector<Value> getValueStack() {
     return ValueStack;
   }
+  std::vector<int> getTypeStack() {
+    return TypeStack;
+  }
   
   void setFrameStack(std::vector<Frame> fs) {
     FrameStack = fs;
@@ -153,11 +162,15 @@ public:
   void setValueStack(std::vector<Value> vs) {
     ValueStack = vs;
   }
+  void setTypeStack(std::vector<int> ts) {
+    TypeStack = ts;
+  }
   
 private:
   /// \name Data of stack manager.
   /// @{
   std::vector<Value> ValueStack;
+  std::vector<int>   TypeStack;
   std::vector<Frame> FrameStack;
   /// @}
 };

@@ -138,6 +138,56 @@ public:
   }
 
   /// ================
+  /// Dump functions for WAMR
+  /// ================
+  void dumpMemory(const Runtime::Instance::ModuleInstance* ModInst) {
+    ModInst->dumpMemInst("wamr_");
+  }
+  
+  void dumpGlobal(const Runtime::Instance::ModuleInstance* ModInst) {
+    ModInst->dumpGlobInst("wamr_");
+  }
+  
+  void dumpStack(Runtime::StackManager& StackMgr) {
+    std::ofstream fout;
+    // fout.open("wamr_stack.img", std::ios::out | std::ios::binary | std::ios::trunc);
+    fout.open("wamr_stack.img", std::ios::out | std::ios::trunc);
+    
+    using Value = ValVariant;
+    std::vector<Value> Vals = StackMgr.getValueStack();
+    std::vector<int> Typs = StackMgr.getTypeStack();
+    
+    if (Vals.size() != Typs.size()) {
+      std::cerr << "ValStack size != TypStack size" << std::endl;
+      exit(1);
+    }
+
+    for (size_t I = 0; I < Vals.size(); ++I) {
+      Value v = Vals[I];
+      int t = Typs[I];
+      // 32bitのとき
+      if (t == 0) 
+        fout << v.get<uint32_t>() << std::endl;
+      else if (t == 1) 
+        fout << v.get<uint64_t>() << std::endl;
+      else {
+        std::cerr << "Type size is not 32bit or 64bit" << std::endl;
+        exit(1);
+      }
+    }
+    
+    fout.close();
+  }
+  
+  // void dumpFrame() {
+    
+  // }
+  
+  // void dumpAddrs() {
+
+  // }
+
+  /// ================
   /// Dump functions
   /// ================
   /// TODO: 関数名を中身にあったものにrenameする
