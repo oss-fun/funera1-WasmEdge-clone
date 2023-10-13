@@ -81,19 +81,30 @@ public:
       case OpCode::If:
       case OpCode::Br:
       case OpCode::Br_if:
+        break;
       case OpCode::Call:
       case OpCode::Return_call:
-      case OpCode::Select_t:
+        res += encodeLeb(Instr.getTargetIndex());
+        break;
+      // NOTE: いるかわからんので放置
+      // case OpCode::Select_t:
+      //   break;
       case OpCode::Table__get:
       case OpCode::Table__set:
+        res += encodeLeb(Instr.getTargetIndex());
+        break;
       case OpCode::Ref__null:
       case OpCode::Ref__func:
+        res += encodeLeb(Instr.getTargetIndex());
+        break;
       case OpCode::Local__get:
       case OpCode::Local__set:
       case OpCode::Local__tee:
+        res += encodeLeb(Instr.getStackOffset());
+        break;
       case OpCode::Global__get:
       case OpCode::Global__set:
-        skip_leb();
+        res += encodeLeb(Instr.getTargetIndex());
         break;
       case OpCode::I32__load:
       case OpCode::I64__load:
@@ -120,16 +131,30 @@ public:
       case OpCode::I64__store32:
       case OpCode::Memory__grow:
       case OpCode::Memory__size:
-        skip_leb();
-        skip_leb();
+        res += encodeLeb(Instr.getTargetIndex());
+        res += encodeLeb(Instr.getMemoryOffset());
         break;
       case OpCode::I32__const:
       case OpCode::I64__const:
       case OpCode::F32__const:
       case OpCode::F64__const:
-        skip_leb();
+        res += encodeLeb((Instr.getNum()).get<uint64_t>());
         break;
-      // TODO: data dropとかの1opcodeで複数cell使うやつはその分offsetに足す
+
+      /// MISC RPEFIX
+      case OpCode::Memory__init:
+      case OpCode::Data__drop:
+      case OpCode::Memory__copy:
+      case OpCode::Memory__fill:
+      case OpCode::Table__init:
+      case OpCode::Elem__drop:
+      case OpCode::Table__copy:
+      case OpCode::Table__grow:
+      case OpCode::Table__size:
+      case OpCode::Table__fill:
+        res++; // OpCodeが2byte分使う
+        res += encodeLeb(Instr.getTargetIndex());
+        break;
     }
   }
 
