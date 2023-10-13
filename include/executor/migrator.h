@@ -289,12 +289,11 @@ public:
     fout.close();
   }
   
-  void dumpProgramCounter(const AST::InstrView::iterator PCNow) {
+  void dumpProgramCounter(const AST::InstrView::iterator PCNow, std::ostream& fout) {
     IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
     assert(IterMigrator);
 
-    std::ofstream fout;
-    fout.open("wamr_iter.img", std::ios::trunc);
+    // fout.open("wamr_iter.img", std::ios::trunc);
 
     struct SourceLoc Data = IterMigrator[PCNow];
     uint32_t FuncIdx = Data.FuncIdx;
@@ -310,12 +309,85 @@ public:
     fout << FuncIdx << std::endl;
     fout << Offset;
       
-    fout.close();
+    // fout.close();
   }
   
-  // void dumpFrame() {
+  /// dumpするもの
+  void dumpFrame(Runtime::StackManager &StackMgr) {
+    using Value = ValVariant;
+
+    std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
+    std::vector<Value> ValueStack = StackMgr.getValueStack();
+    std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
+    std::ofstream fout;
+    fout.open("wamr_frame.img", std::ios::trunc);
     
-  // }
+    // WAMRは4bytesセルが何個でカウントするので、それに合わせてOffsetをdumpする
+    // [Start, End]の範囲でStackを回して、32bitなら+1, 64bitなら+2とする
+    auto getStackOffset = [&](uint32_t Start, uint32_t End) {
+      uint32_t Offset = 0;
+      for (uint32_t I = Start; I <= End; I++) {
+        Value V = ValueStack[I];
+        uint8_t T = TypeStack[I];
+        // T==0のとき32bit, T==1のとき64bit
+        Offset += (T == 1 ? 2 : 1);
+      }
+      return Offset;
+    };
+
+    std::map<std::string_view, bool> seenModInst;
+    for (size_t I = 0; I < FrameStack.size(); ++I) {
+      Runtime::StackManager::Frame f = FrameStack[I];
+
+      // ModuleInstance
+      const Runtime::Instance::ModuleInstance *ModInst = f.Module;
+
+      uint32_t prevVPos = 0;
+      // dummpy frame
+      if (ModInst == nullptr) {
+        fout << -1 << std::endl;
+        // fout << all_cell_num << std::endl;
+        fout << std::endl;
+      }
+      else {
+        std::string_view ModName = ModInst->getModuleName();
+        fout << ModName << std::endl;
+
+        // まだそのModInstを保存してなければ、dumpする
+        // if (!seenModInst[ModName]) {
+        //   ModInst->dumpMemInst(fname_header + std::string(ModName));
+        //   ModInst->dumpGlobInst(fname_header + std::string(ModName));
+        //   seenModInst[ModName] = true;
+        // }
+ 
+        // ip_offset
+        dumpProgramCounter(f.From, fout);
+        fout << std::endl;
+        // sp_offset
+        fout << getStackOffset(prevVPos + f.Locals, f.VPos) << std::endl;
+        // csp_offset
+        // lp (params, locals)
+        for (uint32_t I = prevVPos; I <= prevVPos + f.Locals; I++) {
+          Value V = ValueStack[I];
+          uint8_t T = TypeStack[I];
+
+          if (T == 0) 
+            fout << V.get<uint32_t>() << std::endl;
+          else  
+            fout << V.get<uint64_t>() << std::endl;
+        }
+        // stack
+        fout << WamrStack << std::out;
+        // for csp_num
+        //  cps->begin_addr_offset
+        //  cps->target_addr_offset
+        //  cps->sp_offset
+        //  cps->cell_num
+      }
+    }
+
+    fout.close();
+  }
   
   // void dumpAddrs() {
 

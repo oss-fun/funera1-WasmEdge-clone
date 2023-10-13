@@ -152,7 +152,7 @@ public:
   std::vector<Value> getValueStack() {
     return ValueStack;
   }
-  std::vector<int> getTypeStack() {
+  std::vector<uint8_t> getTypeStack() {
     return TypeStack;
   }
   
@@ -162,7 +162,7 @@ public:
   void setValueStack(std::vector<Value> vs) {
     ValueStack = vs;
   }
-  void setTypeStack(std::vector<int> ts) {
+  void setTypeStack(std::vector<uint8_t> ts) {
     TypeStack = ts;
   }
   
@@ -170,7 +170,7 @@ private:
   /// \name Data of stack manager.
   /// @{
   std::vector<Value> ValueStack;
-  std::vector<int>   TypeStack;
+  std::vector<uint8_t> TypeStack;
   std::vector<Frame> FrameStack;
   /// @}
 };
