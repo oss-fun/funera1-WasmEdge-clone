@@ -47,6 +47,91 @@ public:
   //   const Runtime::Instance::FunctionInstance* constFunc = const_cast<const Runtime::Instance::FunctionInstance*>(newFunc);
   //   return constFunc;
   // } 
+  // 
+
+  /// convert wasmedge iterator to wamr itertor
+  uint32_t dispatch(const AST::InstrView::iterator PC) {
+    const AST::Instruction &Instr = *PC;
+    uint32_t res = 1;
+
+    // encode後のoffsetさえわかればいい
+    auto encodeLeb = [](uint64_t val) {
+      uint32_t offset = 0;
+      do {
+        uint8_t byte = val & 0x7F;
+        val >>= 7;
+        if (val > 0) {
+          byte |= 0x80;
+        }
+        offset++;
+      } while (val > 0);
+      return offset;
+    };
+
+    switch (Instr.getOpCode()) {
+      case OpCode::Call_indirect:
+        res += encodeLeb(Instr.getSourceIndex());
+        res += encodeLeb(Instr.getTargetIndex());
+        break;
+      case OpCode::Br_table:
+        // todo
+        break;
+      case OpCode::Block:
+      case OpCode::Loop:
+      case OpCode::If:
+      case OpCode::Br:
+      case OpCode::Br_if:
+      case OpCode::Call:
+      case OpCode::Return_call:
+      case OpCode::Select_t:
+      case OpCode::Table__get:
+      case OpCode::Table__set:
+      case OpCode::Ref__null:
+      case OpCode::Ref__func:
+      case OpCode::Local__get:
+      case OpCode::Local__set:
+      case OpCode::Local__tee:
+      case OpCode::Global__get:
+      case OpCode::Global__set:
+        skip_leb();
+        break;
+      case OpCode::I32__load:
+      case OpCode::I64__load:
+      case OpCode::F32__load:
+      case OpCode::F64__load:
+      case OpCode::I32__load8_s:
+      case OpCode::I32__load8_u:
+      case OpCode::I32__load16_s:
+      case OpCode::I32__load16_u:
+      case OpCode::I64__load8_s:
+      case OpCode::I64__load8_u:
+      case OpCode::I64__load16_s:
+      case OpCode::I64__load16_u:
+      case OpCode::I64__load32_s:
+      case OpCode::I64__load32_u:
+      case OpCode::I32__store:
+      case OpCode::I64__store:
+      case OpCode::F32__store:
+      case OpCode::F64__store:
+      case OpCode::I32__store8:
+      case OpCode::I32__store16:
+      case OpCode::I64__store8:
+      case OpCode::I64__store16:
+      case OpCode::I64__store32:
+      case OpCode::Memory__grow:
+      case OpCode::Memory__size:
+        skip_leb();
+        skip_leb();
+        break;
+      case OpCode::I32__const:
+      case OpCode::I64__const:
+      case OpCode::F32__const:
+      case OpCode::F64__const:
+        skip_leb();
+        break;
+      // TODO: data dropとかの1opcodeで複数cell使うやつはその分offsetに足す
+    }
+  }
 
   /// Find module by name.
   const Runtime::Instance::ModuleInstance *findModule(std::string_view Name) const {
