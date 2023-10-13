@@ -289,6 +289,30 @@ public:
     fout.close();
   }
   
+  void dumpProgramCounter(const AST::InstrView::iterator PCNow) {
+    IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
+    assert(IterMigrator);
+
+    std::ofstream fout;
+    fout.open("wamr_iter.img", std::ios::trunc);
+
+    struct SourceLoc Data = IterMigrator[PCNow];
+    uint32_t FuncIdx = Data.FuncIdx;
+    uint32_t Offset = 0;
+    AST::InstrView::iterator It = PCNow;
+    for (uint32_t i = 0; i < Data.Offset; i++)  It--;
+
+    while (It != PCNow) {
+      Offset += dispatch(It);
+      It++;
+    }
+
+    fout << FuncIdx << std::endl;
+    fout << Offset;
+      
+    fout.close();
+  }
+  
   // void dumpFrame() {
     
   // }
