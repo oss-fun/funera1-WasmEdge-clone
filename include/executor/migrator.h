@@ -299,7 +299,7 @@ public:
     uint32_t FuncIdx = Data.FuncIdx;
     uint32_t Offset = 0;
     AST::InstrView::iterator It = PCNow;
-    for (uint32_t i = 0; i < Data.Offset; i++)  It--;
+    It -= Data.Offset;
 
     while (It != PCNow) {
       Offset += dispatch(It);
@@ -310,6 +310,64 @@ public:
     fout << Offset;
       
     // fout.close();
+  }
+  
+  struct CtrlInfo {
+    AST::InstrView::iterator Iter;
+  };
+
+  std::vector<struct CtrlInfo> getCtrlStack(const AST::InstrView::iterator PCNow) {
+    std::vector<struct CtrlInfo> CtrlStack;
+    
+    IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
+    assert(IterMigrator);
+
+    struct SourceLoc Data = IterMigrator[PCNow];
+    uint32_t FuncIdx = Data.FuncIdx;
+    uint32_t Offset = 0;
+    AST::InstrView::iterator It = PCNow;
+    
+    // プログラムカウンタを関数の先頭に戻す
+    It -= Data.Offset;
+    
+    auto CtrlPush = [&](const AST::InstrView::iterator It) {
+      struct CtrlInfo info = CtrlInfo {It};
+      CtrlStack.push_back(info);
+    };
+
+    auto CtrlPop = [&]() {
+      CtrlStack.pop_back();
+    };
+
+    while (It != PCNow) {
+      // dispatchする必要ないかも
+      // Offset += dispatch(It);
+      const AST::Instruction &Instr = *It;
+      switch (Instr.getOpCode()) {
+        // push
+        case OpCode::Block:
+        case OpCode::Loop:
+        case OpCode::If:
+        case OpCode::Call:
+        case OpCode::Return_call:
+          CtrlPush(It);
+          break;
+        // pop
+        case OpCode::End:
+        case OpCode::Br:
+        case OpCode::Br_if:
+        case OpCode::Br_table:
+          // TODO: Br系は抜けるブロックの分だけPOPする必要がある
+          CtrlPop();
+          break;
+        default:
+          break;
+      }
+
+      It++;
+    }
+    
+    return CtrlStack;
   }
   
   /// dumpするもの
@@ -339,6 +397,9 @@ public:
     for (size_t I = 0; I < FrameStack.size(); ++I) {
       Runtime::StackManager::Frame f = FrameStack[I];
 
+      // control stack
+      std::vector<struct CtrlInfo> CtrlStack = getCtrlStack();
+
       // ModuleInstance
       const Runtime::Instance::ModuleInstance *ModInst = f.Module;
 
@@ -361,13 +422,22 @@ public:
         // }
  
         // ip_offset
+        fout << "ip_offset" << std::endl;
         dumpProgramCounter(f.From, fout);
         fout << std::endl;
+
         // sp_offset
+        fout << "sp_offset" << std::endl;
         fout << getStackOffset(prevVPos + f.Locals, f.VPos) << std::endl;
         fout << std::endl;
+
         // csp_offset
+        fout << "csp_offset" << std::endl;
+        fout << CtrlStack.size() << std::endl;
+        fout << std::endl;
+        
         // lp (params, locals)
+        fout << "lp(params, locals)" << std::endl;
         for (uint32_t I = prevVPos+1; I <= prevVPos + f.Locals; I++) {
           Value V = ValueStack[I];
           uint8_t T = TypeStack[I];
@@ -378,7 +448,9 @@ public:
             fout << std::setw(64) << std::setfill('0') << V.get<uint64_t>() << std::endl;
         }
         fout << std::endl;
+
         // stack
+        fout << "stack" << std::endl;
         for (uint32_t I = prevVPos + f.Locals + 1; I <= f.VPos; I++) {
           Value V = ValueStack[I];
           uint8_t T = TypeStack[I];
@@ -388,11 +460,19 @@ public:
           else  
             fout << std::setw(64) << std::setfill('0') << V.get<uint64_t>() << std::endl;
         }
+        
+
         // for csp_num
         //  cps->begin_addr_offset
         //  cps->target_addr_offset
         //  cps->sp_offset
         //  cps->cell_num
+        for (uint32_t I = 0; I < CtrlStack.size(); I++) {
+          struct CtrlInfo info = CtrlStack[I];
+          // cps->begin_addr_offset
+          
+          fout << info.Iter
+        }
       }
     }
 
