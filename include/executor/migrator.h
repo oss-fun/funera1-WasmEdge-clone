@@ -365,19 +365,29 @@ public:
         fout << std::endl;
         // sp_offset
         fout << getStackOffset(prevVPos + f.Locals, f.VPos) << std::endl;
+        fout << std::endl;
         // csp_offset
         // lp (params, locals)
-        for (uint32_t I = prevVPos; I <= prevVPos + f.Locals; I++) {
+        for (uint32_t I = prevVPos+1; I <= prevVPos + f.Locals; I++) {
           Value V = ValueStack[I];
           uint8_t T = TypeStack[I];
 
           if (T == 0) 
-            fout << V.get<uint32_t>() << std::endl;
+            fout << std::setw(32) << std::setfill('0') << V.get<uint32_t>() << std::endl;
           else  
-            fout << V.get<uint64_t>() << std::endl;
+            fout << std::setw(64) << std::setfill('0') << V.get<uint64_t>() << std::endl;
         }
+        fout << std::endl;
         // stack
-        fout << WamrStack << std::out;
+        for (uint32_t I = prevVPos + f.Locals + 1; I <= f.VPos; I++) {
+          Value V = ValueStack[I];
+          uint8_t T = TypeStack[I];
+
+          if (T == 0) 
+            fout << std::setw(32) << std::setfill('0') << V.get<uint32_t>() << std::endl;
+          else  
+            fout << std::setw(64) << std::setfill('0') << V.get<uint64_t>() << std::endl;
+        }
         // for csp_num
         //  cps->begin_addr_offset
         //  cps->target_addr_offset
