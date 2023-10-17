@@ -383,36 +383,33 @@ public:
     std::vector<Value> ValueStack = StackMgr.getValueStack();
     std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
     // TypeStackからWAMRのセルの個数累積和みたいにする
-    std::vector<uint32_t> WamrCellSumStack(TypeStack.size(), 0);
+    // 累積和 1-indexed
+    std::vector<uint32_t> WamrCellSumStack(TypeStack.size()+1, 0);
 
     IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
 
     // WamrCelSumStackの初期化
     for (uint32_t I = 0; I < TypeStack.size(); I++) {
-      if (I == 0) 
-        WamrCellSumStack[I] = (TypeStack[I] == 0 ? 1 : 2);
-      else 
-        WamrCellSumStack[I] = WamrCellSumStack[I-1] + (TypeStack[I] == 0 ? 1 : 2);
+        WamrCellSumStack[I+1] = WamrCellSumStack[I] + (TypeStack[I] == 0 ? 1 : 2);
     }
     std::ofstream fout;
     fout.open("wamr_frame.img", std::ios::trunc);
     
     // WAMRは4bytesセルが何個でカウントするので、それに合わせてOffsetをdumpする
+    // [Start, End]の区間のcell_numを取得
     auto getStackOffset = [&](uint32_t Start, uint32_t End) {
-      return WamrCellSumStack.at(End) - WamrCellSumStack.at(Start-1);
+      return WamrCellSumStack.at(End) - WamrCellSumStack.at(Start);
     };
 
     
     std::vector<struct CtrlInfo> LastCtrlStack;
+    uint32_t prevVPos = 0;
 
+    std::cout << "[DEBUG]frame num: " << FrameStack.size() << std::endl;
     // Frame Stackを走査
     for (size_t I = 0; I < FrameStack.size(); ++I) {
       Runtime::StackManager::Frame f = FrameStack[I];
-
-      // control stack
       std::vector<struct CtrlInfo> CtrlStack = getCtrlStack(f.From);
-
-      // ModuleInstance
       const Runtime::Instance::ModuleInstance *ModInst = f.Module;
 
       // Last
@@ -420,7 +417,6 @@ public:
         LastCtrlStack = CtrlStack;
       }
 
-      uint32_t prevVPos = 0;
       // dummpy frame
       if (ModInst == nullptr) {
         fout << -1 << std::endl;
@@ -436,16 +432,19 @@ public:
         fout << "ip_offset" << std::endl;
         dumpProgramCounter(f.From, fout);
         fout << std::endl;
+        std::cout << "[DEBUG] " << I+1 << ") ip_offset" << std::endl;
 
         // sp_offset
         fout << "sp_offset" << std::endl;
         fout << getStackOffset(prevVPos + f.Locals, f.VPos) << std::endl;
         fout << std::endl;
+        std::cout << "[DEBUG] " << I+1 << ") sp_offset" << std::endl;
 
         // csp_offset
         fout << "csp_offset" << std::endl;
         fout << CtrlStack.size() << std::endl;
         fout << std::endl;
+        std::cout << "[DEBUG] " << I+1 << ") csp_offset" << std::endl;
         
         // lp (params, locals)
         fout << "lp(params, locals)" << std::endl;
@@ -459,6 +458,7 @@ public:
             fout << std::setw(64) << std::setfill('0') << V.get<uint64_t>() << std::endl;
         }
         fout << std::endl;
+        std::cout << "[DEBUG] " << I+1 << ") lp(params, locals)" << std::endl;
 
         // stack
         fout << "stack" << std::endl;
@@ -471,6 +471,7 @@ public:
           else  
             fout << std::setw(64) << std::setfill('0') << V.get<uint64_t>() << std::endl;
         }
+        std::cout << "[DEBUG] " << I+1 << ") stack" << std::endl;
         
 
         // for csp_num
@@ -478,6 +479,8 @@ public:
         //  cps->target_addr_offset
         //  cps->sp_offset
         //  cps->cell_num (= resultのcellの数)
+        fout << "csp" << std::endl;
+        std::cout << "[DEBUG] CtrlStack.size(): " << CtrlStack.size() << std::endl;
         for (uint32_t I = 0; I < CtrlStack.size(); I++) {
           struct CtrlInfo info = CtrlStack[I];
           const AST::Instruction &Instr = *info.Iter;
@@ -489,19 +492,25 @@ public:
           // cps->begin_addr_offset
           struct SourceLoc Begin = IterMigrator[BeginAddr];
           fout << Begin.Offset << std::endl;
+          std::cout << "[DEBUG] Begin.Offset: " << Begin.Offset << std::endl;
 
           // cps->target_addr_offset
           struct SourceLoc Target = IterMigrator[TargetAddr];
           fout << Target.Offset << std::endl;
+          std::cout << "[DEBUG] Target.Offset: " << Target.Offset << std::endl;
           
           // csp->sp_offset
           fout << sp_offset << std::endl;
+          std::cout << "[DEBUG] sp_offset: " << sp_offset << std::endl;
           
           // csp->cell_num
           fout << result_cells << std::endl;
+          std::cout << "[DEBUG] result_cells: " << result_cells << std::endl;
           
           fout << std::endl;
         }
+        fout << std::endl;
+        std::cout << "[DEBUG] " << I+1 << ") csp" << std::endl << std::endl;
       }
     }
 
