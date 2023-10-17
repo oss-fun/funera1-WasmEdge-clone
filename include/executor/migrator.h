@@ -376,21 +376,30 @@ public:
     std::vector<Value> ValueStack = StackMgr.getValueStack();
     std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
     // TypeStackからWAMRのセルの個数累積和みたいにする
-    std::vector<uint32_t> WamrCellSumStack(TypeStack.size());
+    std::vector<uint32_t> WamrCellSumStack(TypeStack.size(), 0);
+
+    IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
+
+    // WamrCelSumStackの初期化
     for (uint32_t I = 0; I < TypeStack.size(); I++) {
-      if (I > 0) WamrCellSumStack[I] = WamrCellSumStack[I-1] + (TypeStack[I] == 0 ? 1 : 2);
-      else WamrCellSumStack[I] = (TypeStack[I] == 0 ? 1 : 2);
+      if (I == 0) 
+        WamrCellSumStack[I] = (TypeStack[I] == 0 ? 1 : 2);
+      else 
+        WamrCellSumStack[I] = WamrCellSumStack[I-1] + (TypeStack[I] == 0 ? 1 : 2);
     }
     std::ofstream fout;
     fout.open("wamr_frame.img", std::ios::trunc);
     
     // WAMRは4bytesセルが何個でカウントするので、それに合わせてOffsetをdumpする
-    // [Start, End]の範囲でStackを回して、32bitなら+1, 64bitなら+2とする
     auto getStackOffset = [&](uint32_t Start, uint32_t End) {
-      // TODO: Start, Endが範囲
       return WamrCellSumStack.at(End) - WamrCellSumStack.at(Start-1);
     };
 
+    
+    std::vector<struct CtrlInfo> LastCtrlStack;
+    const Runtime::Instance::ModuleInstance *LastModInst;
+
+    // Frame Stackを走査
     for (size_t I = 0; I < FrameStack.size(); ++I) {
       Runtime::StackManager::Frame f = FrameStack[I];
 
@@ -399,6 +408,12 @@ public:
 
       // ModuleInstance
       const Runtime::Instance::ModuleInstance *ModInst = f.Module;
+
+      // Last
+      if (I == FrameStack.size() - 1) {
+        LastCtrlStack = CtrlStack;
+        LastModInst = ModInst;
+      }
 
       uint32_t prevVPos = 0;
       // dummpy frame
@@ -458,7 +473,6 @@ public:
         //  cps->target_addr_offset
         //  cps->sp_offset
         //  cps->cell_num (= resultのcellの数)
-        IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
         for (uint32_t I = 0; I < CtrlStack.size(); I++) {
           struct CtrlInfo info = CtrlStack[I];
           const AST::Instruction &Instr = *info.Iter;
@@ -485,6 +499,18 @@ public:
         }
       }
     }
+
+    // Addr.img
+    struct CtrlInfo CtrlTop = LastCtrlStack.back();
+    const AST::Instruction& Instr = *(CtrlTop.Iter);
+    // else_addr
+    AST::InstrView::iterator ElseAddr = CtrlTop.Iter + Instr.getJumpElse();
+    auto Data = IterMigrator[ElseAddr];
+    fout << Data.Offset << std::endl;
+    // end_addr
+    AST::InstrView::iterator EndAddr = CtrlTop.Iter + Instr.getJumpEnd();
+    auto Data = IterMigrator[EndAddr];
+    fout << Data.Offset << std::endl;
 
     fout.close();
   }
