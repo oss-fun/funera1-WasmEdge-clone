@@ -391,12 +391,11 @@ public:
       return WamrCellSumStack.at(End) - WamrCellSumStack.at(Start-1);
     };
 
-    std::map<std::string_view, bool> seenModInst;
     for (size_t I = 0; I < FrameStack.size(); ++I) {
       Runtime::StackManager::Frame f = FrameStack[I];
 
       // control stack
-      std::vector<struct CtrlInfo> CtrlStack = getCtrlStack();
+      std::vector<struct CtrlInfo> CtrlStack = getCtrlStack(f.From);
 
       // ModuleInstance
       const Runtime::Instance::ModuleInstance *ModInst = f.Module;
@@ -405,6 +404,7 @@ public:
       // dummpy frame
       if (ModInst == nullptr) {
         fout << -1 << std::endl;
+        // TODO: dummy frameのall_cell_numいる
         // fout << all_cell_num << std::endl;
         fout << std::endl;
       }
@@ -412,13 +412,6 @@ public:
         std::string_view ModName = ModInst->getModuleName();
         fout << ModName << std::endl;
 
-        // まだそのModInstを保存してなければ、dumpする
-        // if (!seenModInst[ModName]) {
-        //   ModInst->dumpMemInst(fname_header + std::string(ModName));
-        //   ModInst->dumpGlobInst(fname_header + std::string(ModName));
-        //   seenModInst[ModName] = true;
-        // }
- 
         // ip_offset
         fout << "ip_offset" << std::endl;
         dumpProgramCounter(f.From, fout);
@@ -496,9 +489,9 @@ public:
     fout.close();
   }
   
-  // void dumpAddrs() {
+  void dumpAddrs() {
 
-  // }
+  }
 
   /// ================
   /// Dump functions
