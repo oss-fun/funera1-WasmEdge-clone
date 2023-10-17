@@ -340,8 +340,6 @@ public:
     };
 
     while (It != PCNow) {
-      // dispatchする必要ないかも
-      // Offset += dispatch(It);
       const AST::Instruction &Instr = *It;
       switch (Instr.getOpCode()) {
         // push
@@ -377,20 +375,20 @@ public:
     std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
     std::vector<Value> ValueStack = StackMgr.getValueStack();
     std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
+    // TypeStackからWAMRのセルの個数累積和みたいにする
+    std::vector<uint32_t> WamrCellSumStack(TypeStack.size());
+    for (uint32_t I = 0; I < TypeStack.size(); I++) {
+      if (I > 0) WamrCellSumStack[I] = WamrCellSumStack[I-1] + (TypeStack[I] == 0 ? 1 : 2);
+      else WamrCellSumStack[I] = (TypeStack[I] == 0 ? 1 : 2);
+    }
     std::ofstream fout;
     fout.open("wamr_frame.img", std::ios::trunc);
     
     // WAMRは4bytesセルが何個でカウントするので、それに合わせてOffsetをdumpする
     // [Start, End]の範囲でStackを回して、32bitなら+1, 64bitなら+2とする
     auto getStackOffset = [&](uint32_t Start, uint32_t End) {
-      uint32_t Offset = 0;
-      for (uint32_t I = Start; I <= End; I++) {
-        Value V = ValueStack[I];
-        uint8_t T = TypeStack[I];
-        // T==0のとき32bit, T==1のとき64bit
-        Offset += (T == 1 ? 2 : 1);
-      }
-      return Offset;
+      // TODO: Start, Endが範囲
+      return WamrCellSumStack.at(End) - WamrCellSumStack.at(Start-1);
     };
 
     std::map<std::string_view, bool> seenModInst;
@@ -466,12 +464,31 @@ public:
         //  cps->begin_addr_offset
         //  cps->target_addr_offset
         //  cps->sp_offset
-        //  cps->cell_num
+        //  cps->cell_num (= resultのcellの数)
+        IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
         for (uint32_t I = 0; I < CtrlStack.size(); I++) {
           struct CtrlInfo info = CtrlStack[I];
+          const AST::Instruction &Instr = *info.Iter;
+          const AST::InstrView::iterator BeginAddr = info.Iter;
+          const AST::InstrView::iterator TargetAddr = BeginAddr + Instr.getJump().PCOffset; // TODO: TargetAddrの位置をちゃんと調べる
+          uint32_t sp_offset = WamrCellSumStack[Instr.getJump().StackEraseBegin]; 
+          uint32_t result_cells = WamrCellSumStack[Instr.getJump().StackEraseEnd];
+
           // cps->begin_addr_offset
+          struct SourceLoc Begin = IterMigrator[BeginAddr];
+          fout << Begin.Offset << std::endl;
+
+          // cps->target_addr_offset
+          struct SourceLoc Target = IterMigrator[BeginAddr];
+          fout << Target.Offset << std::endl;
           
-          fout << info.Iter
+          // csp->sp_offset
+          fout << sp_offset << std::endl;
+          
+          // csp->cell_num
+          fout << result_cells << std::endl;
+          
+          fout << std::endl;
         }
       }
     }
