@@ -86,8 +86,20 @@ Executor::enterFunction(Runtime::StackManager &StackMgr,
     }
 
     // Push returns back to stack.
-    for (auto &R : Rets) {
-      StackMgr.push(std::move(R));
+    std::vector<ValType> RetTypes = FuncType.getReturnTypes();
+    for (uint32_t I = 0; I < Rets.size(); I++) {
+      auto &R = Rets[I];
+
+      if (RetTypes[I] == ValType::I32 || RetTypes[I] == ValType::F32) {
+        StackMgr.push<uint32_t>(std::move(R).get<uint32_t>());
+      }
+      else if (RetTypes[I] == ValType::I64 || RetTypes[I] == ValType::F64) {
+        StackMgr.push<uint64_t>(std::move(R).get<uint64_t>());
+      }
+      else {
+        StackMgr.push(std::move(R));
+      }
+      
     }
 
     // For host function case, the continuation will be the continuation from
@@ -155,7 +167,15 @@ Executor::enterFunction(Runtime::StackManager &StackMgr,
     // Push local variables into the stack.
     for (auto &Def : Func.getLocals()) {
       for (uint32_t I = 0; I < Def.first; I++) {
-        StackMgr.push(ValueFromType(Def.second));
+        if (Def.second == ValType::I32 || Def.second == ValType::F32) {
+          StackMgr.push<uint32_t>(ValueFromType(Def.second).get<uint32_t>());
+        }
+        else if (Def.second == ValType::I64 || Def.second == ValType::F64) {
+          StackMgr.push<uint64_t>(ValueFromType(Def.second).get<uint64_t>());
+        }
+        else {
+          StackMgr.push(ValueFromType(Def.second));
+        }
       }
     }
 

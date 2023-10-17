@@ -155,7 +155,10 @@ public:
         res++; // OpCodeが2byte分使う
         res += encodeLeb(Instr.getTargetIndex());
         break;
+      default:
+        break;
     }
+    return res;
   }
 
   /// Find module by name.
@@ -251,11 +254,11 @@ public:
   /// Dump functions for WAMR
   /// ================
   void dumpMemory(const Runtime::Instance::ModuleInstance* ModInst) {
-    ModInst->dumpMemInst("wamr_");
+    ModInst->dumpMemInst("wamr");
   }
   
   void dumpGlobal(const Runtime::Instance::ModuleInstance* ModInst) {
-    ModInst->dumpGlobInst("wamr_");
+    ModInst->dumpGlobInst("wamr");
   }
   
   void dumpStack(Runtime::StackManager& StackMgr) {
@@ -265,12 +268,18 @@ public:
     
     using Value = ValVariant;
     std::vector<Value> Vals = StackMgr.getValueStack();
-    std::vector<int> Typs = StackMgr.getTypeStack();
+    std::vector<uint8_t> Typs = StackMgr.getTypeStack();
     
     if (Vals.size() != Typs.size()) {
       std::cerr << "ValStack size != TypStack size" << std::endl;
+      std::cerr << "ValStack size: " << Vals.size() << std::endl;
+      std::cerr << "TypStack size: " << Typs.size() << std::endl;
       exit(1);
     }
+
+    std::cout << "[DEBUG]TypeStack: [";
+    for (size_t I = 0; I < Vals.size(); ++I) std::cout << +Typs[I];
+    std::cout << "]" << std::endl;
 
     for (size_t I = 0; I < Vals.size(); ++I) {
       Value v = Vals[I];
@@ -323,8 +332,6 @@ public:
     assert(IterMigrator);
 
     struct SourceLoc Data = IterMigrator[PCNow];
-    uint32_t FuncIdx = Data.FuncIdx;
-    uint32_t Offset = 0;
     AST::InstrView::iterator It = PCNow;
     
     // プログラムカウンタを関数の先頭に戻す
@@ -397,7 +404,6 @@ public:
 
     
     std::vector<struct CtrlInfo> LastCtrlStack;
-    const Runtime::Instance::ModuleInstance *LastModInst;
 
     // Frame Stackを走査
     for (size_t I = 0; I < FrameStack.size(); ++I) {
@@ -412,7 +418,6 @@ public:
       // Last
       if (I == FrameStack.size() - 1) {
         LastCtrlStack = CtrlStack;
-        LastModInst = ModInst;
       }
 
       uint32_t prevVPos = 0;
@@ -486,7 +491,7 @@ public:
           fout << Begin.Offset << std::endl;
 
           // cps->target_addr_offset
-          struct SourceLoc Target = IterMigrator[BeginAddr];
+          struct SourceLoc Target = IterMigrator[TargetAddr];
           fout << Target.Offset << std::endl;
           
           // csp->sp_offset
@@ -509,14 +514,10 @@ public:
     fout << Data.Offset << std::endl;
     // end_addr
     AST::InstrView::iterator EndAddr = CtrlTop.Iter + Instr.getJumpEnd();
-    auto Data = IterMigrator[EndAddr];
+    Data = IterMigrator[EndAddr];
     fout << Data.Offset << std::endl;
 
     fout.close();
-  }
-  
-  void dumpAddrs() {
-
   }
 
   /// ================

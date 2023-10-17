@@ -59,6 +59,21 @@ public:
     assuming(0 < Offset && Offset <= ValueStack.size());
     return ValueStack[ValueStack.size() - Offset];
   }
+  
+  uint8_t &getTypeTopN(uint32_t Offset) noexcept {
+    assuming(0 < Offset && Offset <= TypeStack.size());
+    return TypeStack[TypeStack.size() - Offset];
+  }
+
+  uint8_t &getTypeTop() noexcept {
+    return TypeStack.back();
+  }
+  
+  // void syncTypeTopN(uint32_t Offset) noexcept {
+  //   assuming(0 < Offset && Offset <= TypeStack.size());
+  //   TypeStack.back() = TypeStack[TypeStack.size() - Offset];
+  //   std::cout << "[DEBUG]push stack: type kind: " << +TypeStack.back() << std::endl;
+  // }
 
   /// Unsafe Getter of top N value entries of stack.
   Span<Value> getTopSpan(uint32_t N) {
@@ -69,9 +84,16 @@ public:
   template <typename T> void push(T &&Val) {
     ValueStack.push_back(std::forward<T>(Val));
     // 32bitなら0, 64bitなら1
-    if (sizeof(T) == 4) TypeStack.push_back(0);
-    else if (sizeof(T) == 8) TypeStack.push_back(1);
-    else TypeStack.push_back(2);
+    if (sizeof(T) == 4) {
+      TypeStack.push_back((uint8_t)0);
+    }
+    else if (sizeof(T) == 8) {
+      TypeStack.push_back((uint8_t)1);
+    }
+    else {
+      TypeStack.push_back((uint8_t)2);
+    }
+    std::cout << "[DEBUG]push stack: type kind: " << +TypeStack.back() << std::endl;
   }
 
   /// Unsafe Pop and return the top entry.
@@ -81,7 +103,7 @@ public:
     TypeStack.pop_back();
     return V;
   }
-
+  
   /// Push a new frame entry to stack.
   void pushFrame(const Instance::ModuleInstance *Module,
                  AST::InstrView::iterator From, uint32_t LocalNum = 0,
@@ -96,6 +118,10 @@ public:
       ValueStack.erase(ValueStack.begin() + FrameStack.back().VPos -
                            FrameStack.back().Locals,
                        ValueStack.end() - LocalNum);
+      TypeStack.erase(TypeStack.begin() + FrameStack.back().VPos -
+                           FrameStack.back().Locals,
+                       TypeStack.end() - LocalNum);
+
       FrameStack.back().Module = Module;
       FrameStack.back().Locals = LocalNum;
       FrameStack.back().Arity = Arity;
@@ -112,6 +138,9 @@ public:
     ValueStack.erase(ValueStack.begin() + FrameStack.back().VPos -
                          FrameStack.back().Locals,
                      ValueStack.end() - FrameStack.back().Arity);
+    TypeStack.erase(TypeStack.begin() + FrameStack.back().VPos - 
+                        FrameStack.back().Locals,
+                     TypeStack.end() - FrameStack.back().Arity);
     auto From = FrameStack.back().From;
     FrameStack.pop_back();
     return From;
@@ -120,8 +149,11 @@ public:
   /// Unsafe erase stack.
   void stackErase(uint32_t EraseBegin, uint32_t EraseEnd) noexcept {
     assuming(EraseEnd <= EraseBegin && EraseBegin <= ValueStack.size());
+    assuming(EraseEnd <= EraseBegin && EraseBegin <= TypeStack.size());
     ValueStack.erase(ValueStack.end() - EraseBegin,
                      ValueStack.end() - EraseEnd);
+    TypeStack.erase(TypeStack.end() - EraseBegin,
+                     TypeStack.end() - EraseEnd);
   }
 
   /// Unsafe leave top label.
