@@ -310,7 +310,7 @@ public:
     AST::InstrView::iterator It = PCNow;
     It -= Data.Offset;
 
-    while (It != PCNow) {
+    while (It <= PCNow) {
       Offset += dispatch(It);
       It++;
     }
@@ -343,7 +343,7 @@ public:
       CtrlStack.pop_back();
     };
 
-    while (It != PCNow) {
+    while (It < PCNow) {
       const AST::Instruction &Instr = *It;
       switch (Instr.getOpCode()) {
         // push
@@ -404,14 +404,18 @@ public:
     uint32_t CurrentSpOfs;
     uint32_t CurrentCspOfs;
 
-    uint32_t prevVPos = 0;
-
     fout << "frame num" << std::endl;
-    fout << FrameStack.size() << std::endl;
+    // I=1のとき飛ばすから-1
+    fout << FrameStack.size()-1 << std::endl;
     fout << std::endl;
 
     // Frame Stackを走査
     for (size_t I = 0; I < FrameStack.size(); ++I) {
+      // I = 1と2のときに__start()を持ってて重複してる。かつI=1の方はWAMRでは使わないので排除
+      if (I == 1) continue;
+
+      Runtime::StackManager::Frame pf = FrameStack[0];
+      if (I > 0) pf = FrameStack[I-1];
       Runtime::StackManager::Frame f = FrameStack[I];
       std::vector<struct CtrlInfo> CtrlStack = getCtrlStack(f.From);
       const Runtime::Instance::ModuleInstance *ModInst = f.Module;
@@ -429,7 +433,7 @@ public:
         // TODO: dummy frameのall_cell_numいる
         // fout << all_cell_num << std::endl;
         fout << "all_cell_num" << std::endl;
-        fout << 100 << std::endl;
+        fout << 2 << std::endl;
       }
       else {
         std::string_view ModName = ModInst->getModuleName();
@@ -450,7 +454,7 @@ public:
         fout << std::endl;
 
         // sp_offset
-        CurrentSpOfs = getStackOffset(prevVPos + f.Locals, f.VPos);
+        CurrentSpOfs = getStackOffset(pf.VPos + f.Locals, f.VPos);
         fout << "sp_offset" << std::endl;
         fout << CurrentSpOfs << std::endl;
         fout << std::endl;
@@ -463,9 +467,9 @@ public:
         
         // lp (params, locals)
         fout << "lp_num" << std::endl;
-        fout << f.Locals << std::endl;
+        fout << pf.Locals << std::endl;
         fout << "lp(params, locals)" << std::endl;
-        for (uint32_t I = prevVPos+1; I <= prevVPos + f.Locals; I++) {
+        for (uint32_t I = pf.VPos-pf.Locals; I < pf.VPos; I++) {
           Value V = ValueStack[I];
           uint8_t T = TypeStack[I];
 
@@ -478,9 +482,9 @@ public:
 
         // stack
         fout << "stack_num" << std::endl;
-        fout << f.VPos - (prevVPos + f.Locals) << std::endl;
+        fout << (f.VPos - f.Locals) - pf.VPos << std::endl;
         fout << "stack" << std::endl;
-        for (uint32_t I = prevVPos + f.Locals + 1; I <= f.VPos; I++) {
+        for (uint32_t I = pf.VPos; I < f.VPos-f.Locals; I++) {
           Value V = ValueStack[I];
           uint8_t T = TypeStack[I];
 
