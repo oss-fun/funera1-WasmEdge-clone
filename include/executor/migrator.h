@@ -298,7 +298,7 @@ public:
     fout.close();
   }
   
-  void dumpProgramCounter(const AST::InstrView::iterator PCNow, std::ostream& fout) {
+  struct SourceLoc convertIterForWamr(const AST::InstrView::iterator PCNow) {
     IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
     assert(IterMigrator);
 
@@ -315,10 +315,7 @@ public:
       It++;
     }
 
-    fout << FuncIdx << std::endl;
-    fout << Offset;
-      
-    // fout.close();
+    return SourceLoc{FuncIdx, Offset};
   }
   
   struct CtrlInfo {
@@ -359,9 +356,9 @@ public:
           break;
         // pop
         case OpCode::End:
-        case OpCode::Br:
-        case OpCode::Br_if:
-        case OpCode::Br_table:
+        // case OpCode::Br:
+        // case OpCode::Br_if:
+        // case OpCode::Br_table:
           // TODO: Br系は抜けるブロックの分だけPOPする必要がある
           CtrlPop();
           break;
@@ -406,6 +403,11 @@ public:
     uint32_t prevVPos = 0;
 
     std::cout << "[DEBUG]frame num: " << FrameStack.size() << std::endl;
+
+    fout << "frame num" << std::endl;
+    fout << FrameStack.size() << std::endl;
+    fout << std::endl;
+
     // Frame Stackを走査
     for (size_t I = 0; I < FrameStack.size(); ++I) {
       Runtime::StackManager::Frame f = FrameStack[I];
@@ -419,19 +421,29 @@ public:
 
       // dummpy frame
       if (ModInst == nullptr) {
+        fout << "func_idx" << std::endl;
         fout << -1 << std::endl;
         // TODO: dummy frameのall_cell_numいる
         // fout << all_cell_num << std::endl;
+        fout << "all_cell_num" << std::endl;
+        fout << 100 << std::endl;
         fout << std::endl;
       }
       else {
         std::string_view ModName = ModInst->getModuleName();
         fout << ModName << std::endl;
+        
+        // debug: 関数インデックスの出力
+        auto Data = IterMigrator[f.From];
+        std::cout << "[DEBUG] Func index: " << Data.FuncIdx << std::endl;
+        std::cout << "[DEBUG] iter offset: " << Data.Offset << std::endl;
 
         // ip_offset
+        Data = convertIterForWamr(f.From);
+        fout << "func_idx" << std::endl;
+        fout << Data.FuncIdx << std::endl;
         fout << "ip_offset" << std::endl;
-        dumpProgramCounter(f.From, fout);
-        fout << std::endl;
+        fout << Data.Offset << std::endl;
         std::cout << "[DEBUG] " << I+1 << ") ip_offset" << std::endl;
 
         // sp_offset
@@ -471,6 +483,7 @@ public:
           else  
             fout << std::setw(64) << std::setfill('0') << V.get<uint64_t>() << std::endl;
         }
+        fout << std::endl;
         std::cout << "[DEBUG] " << I+1 << ") stack" << std::endl;
         
 
@@ -506,25 +519,29 @@ public:
           // csp->cell_num
           fout << result_cells << std::endl;
           std::cout << "[DEBUG] result_cells: " << result_cells << std::endl;
-          
-          fout << std::endl;
         }
         fout << std::endl;
         std::cout << "[DEBUG] " << I+1 << ") csp" << std::endl << std::endl;
       }
     }
 
-    // Addr.img
+    /// Addr.img
+    fout << "addr.img" << std::endl;
     struct CtrlInfo CtrlTop = LastCtrlStack.back();
     const AST::Instruction& Instr = *(CtrlTop.Iter);
+
     // else_addr
     AST::InstrView::iterator ElseAddr = CtrlTop.Iter + Instr.getJumpElse();
     auto Data = IterMigrator[ElseAddr];
     fout << Data.Offset << std::endl;
+
     // end_addr
     AST::InstrView::iterator EndAddr = CtrlTop.Iter + Instr.getJumpEnd();
     Data = IterMigrator[EndAddr];
     fout << Data.Offset << std::endl;
+
+    // done flag
+    fout << 1 << std::endl;
 
     fout.close();
   }
