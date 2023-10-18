@@ -399,7 +399,11 @@ public:
     };
 
     
-    std::vector<struct CtrlInfo> LastCtrlStack;
+    std::vector<struct CtrlInfo> CurrentCtrlStack;
+    uint32_t CurrentIpOfs;
+    uint32_t CurrentSpOfs;
+    uint32_t CurrentCspOfs;
+
     uint32_t prevVPos = 0;
 
     fout << "frame num" << std::endl;
@@ -414,7 +418,7 @@ public:
 
       // Last
       if (I == FrameStack.size() - 1) {
-        LastCtrlStack = CtrlStack;
+        CurrentCtrlStack = CtrlStack;
       }
 
       // dummpy frame
@@ -436,6 +440,7 @@ public:
 
         // ip_offset
         Data = convertIterForWamr(f.From);
+        CurrentIpOfs = Data.Offset;
         fout << "func_idx" << std::endl;
         fout << Data.FuncIdx << std::endl;
         fout << std::endl;
@@ -445,13 +450,15 @@ public:
         fout << std::endl;
 
         // sp_offset
+        CurrentSpOfs = getStackOffset(prevVPos + f.Locals, f.VPos);
         fout << "sp_offset" << std::endl;
-        fout << getStackOffset(prevVPos + f.Locals, f.VPos) << std::endl;
+        fout << CurrentSpOfs << std::endl;
         fout << std::endl;
 
         // csp_offset
+        CurrentCspOfs = CtrlStack.size();
         fout << "csp_offset" << std::endl;
-        fout << CtrlStack.size() << std::endl;
+        fout << CurrentCspOfs << std::endl;
         fout << std::endl;
         
         // lp (params, locals)
@@ -518,24 +525,48 @@ public:
       }
       fout << "===" << std::endl;
     }
+    fout.close();
+
 
     /// Addr.img
-    fout << "addr.img" << std::endl;
-    struct CtrlInfo CtrlTop = LastCtrlStack.back();
+    fout.open("wamr_addrs.img", std::ios::trunc);
+
+    // ip_ofs
+    fout << "ip_ofs" << std::endl;
+    fout << CurrentIpOfs << std::endl;
+    fout << std::endl;
+
+    // sp_ofs
+    fout << "sp_ofs" << std::endl;
+    fout << CurrentSpOfs << std::endl;
+    fout << std::endl;
+
+    // csp_ofs
+    fout << "csp_ofs" << std::endl;
+    fout << CurrentCspOfs << std::endl;
+    fout << std::endl;
+
+    struct CtrlInfo CtrlTop = CurrentCtrlStack.back();
     const AST::Instruction& Instr = *(CtrlTop.Iter);
 
     // else_addr
     AST::InstrView::iterator ElseAddr = CtrlTop.Iter + Instr.getJumpElse();
     auto Data = IterMigrator[ElseAddr];
+    fout << "else_addr" << std::endl;
     fout << Data.Offset << std::endl;
+    fout << std::endl;
 
     // end_addr
     AST::InstrView::iterator EndAddr = CtrlTop.Iter + Instr.getJumpEnd();
     Data = IterMigrator[EndAddr];
+    fout << "end_addr" << std::endl;
     fout << Data.Offset << std::endl;
-
+    fout << std::endl;
+    
     // done flag
+    fout << "done_flag" << std::endl;
     fout << 1 << std::endl;
+    fout << std::endl;
 
     fout.close();
   }
