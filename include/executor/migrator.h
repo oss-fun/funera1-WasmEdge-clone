@@ -49,119 +49,6 @@ public:
   // } 
   // 
 
-  /// convert wasmedge iterator to wamr itertor
-  uint32_t dispatch(const AST::InstrView::iterator PC) {
-    const AST::Instruction &Instr = *PC;
-    uint32_t res = 1;
-
-    // encode後のoffsetさえわかればいい
-    auto encodeLeb = [](uint64_t val) {
-      uint32_t offset = 0;
-      do {
-        uint8_t byte = val & 0x7F;
-        val >>= 7;
-        if (val > 0) {
-          byte |= 0x80;
-        }
-        offset++;
-      } while (val > 0);
-      return offset;
-    };
-
-    switch (Instr.getOpCode()) {
-      case OpCode::Call_indirect:
-        res += encodeLeb(Instr.getSourceIndex());
-        res += encodeLeb(Instr.getTargetIndex());
-        break;
-      case OpCode::Br_table:
-        // todo
-        break;
-      case OpCode::Block:
-        break;
-      case OpCode::Loop:
-      case OpCode::If:
-      case OpCode::Br:
-      case OpCode::Br_if:
-        break;
-      case OpCode::Call:
-      case OpCode::Return_call:
-        res += encodeLeb(Instr.getTargetIndex());
-        break;
-      // NOTE: いるかわからんので放置
-      // case OpCode::Select_t:
-      //   break;
-      case OpCode::Table__get:
-      case OpCode::Table__set:
-        res += encodeLeb(Instr.getTargetIndex());
-        break;
-      case OpCode::Ref__null:
-      case OpCode::Ref__func:
-        res += encodeLeb(Instr.getTargetIndex());
-        break;
-      case OpCode::Local__get:
-      case OpCode::Local__set:
-      case OpCode::Local__tee:
-        res += encodeLeb(Instr.getStackOffset());
-        break;
-      case OpCode::Global__get:
-      case OpCode::Global__set:
-        res += encodeLeb(Instr.getTargetIndex());
-        break;
-      case OpCode::I32__load:
-      case OpCode::I64__load:
-      case OpCode::F32__load:
-      case OpCode::F64__load:
-      case OpCode::I32__load8_s:
-      case OpCode::I32__load8_u:
-      case OpCode::I32__load16_s:
-      case OpCode::I32__load16_u:
-      case OpCode::I64__load8_s:
-      case OpCode::I64__load8_u:
-      case OpCode::I64__load16_s:
-      case OpCode::I64__load16_u:
-      case OpCode::I64__load32_s:
-      case OpCode::I64__load32_u:
-      case OpCode::I32__store:
-      case OpCode::I64__store:
-      case OpCode::F32__store:
-      case OpCode::F64__store:
-      case OpCode::I32__store8:
-      case OpCode::I32__store16:
-      case OpCode::I64__store8:
-      case OpCode::I64__store16:
-      case OpCode::I64__store32:
-      case OpCode::Memory__grow:
-      case OpCode::Memory__size:
-        res += encodeLeb(Instr.getTargetIndex());
-        res += encodeLeb(Instr.getMemoryOffset());
-        break;
-      case OpCode::I32__const:
-      case OpCode::I64__const:
-      case OpCode::F32__const:
-      case OpCode::F64__const:
-        res += encodeLeb((Instr.getNum()).get<uint64_t>());
-        break;
-
-      /// MISC RPEFIX
-      case OpCode::Memory__init:
-      case OpCode::Data__drop:
-      case OpCode::Memory__copy:
-      case OpCode::Memory__fill:
-      case OpCode::Table__init:
-      case OpCode::Elem__drop:
-      case OpCode::Table__copy:
-      case OpCode::Table__grow:
-      case OpCode::Table__size:
-      case OpCode::Table__fill:
-        res++; // OpCodeが2byte分使う
-        res += encodeLeb(Instr.getTargetIndex());
-        break;
-      default:
-        break;
-    }
-    return res;
-  }
-
   /// Find module by name.
   const Runtime::Instance::ModuleInstance *findModule(std::string_view Name) const {
     auto Iter = NamedMod.find(Name);
@@ -299,26 +186,6 @@ public:
     fout.close();
   }
   
-  struct SourceLoc convertIterForWamr(const AST::InstrView::iterator PCNow) {
-    IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
-    assert(IterMigrator);
-
-    // fout.open("wamr_iter.img", std::ios::trunc);
-
-    struct SourceLoc Data = IterMigrator[PCNow];
-    uint32_t FuncIdx = Data.FuncIdx;
-    uint32_t Offset = 0;
-    AST::InstrView::iterator It = PCNow;
-    It -= Data.Offset;
-
-    while (It <= PCNow) {
-      Offset += dispatch(It);
-      It++;
-    }
-
-    return SourceLoc{FuncIdx, Offset};
-  }
-  
   struct CtrlInfo {
     AST::InstrView::iterator Iter;
   };
@@ -441,12 +308,12 @@ public:
         // debug: 関数インデックスの出力
         auto Data = IterMigrator[f.From];
 
-        Data = convertIterForWamr(f.From);
-        CurrentIpOfs = Data.Offset;
+        Data = IterMigrator[f.From];
+        CurrentIpOfs = (f.From+1)->getOffset() - (f.From-Data.Offset)->getOffset();
         // func_idx
         dump("func_idx", Data.FuncIdx);
         // ip_offset
-        dump("ip_offset", Data.Offset);
+        dump("ip_offset", CurrentIpOfs);
         // sp_offset
         CurrentSpOfs = getStackOffset(pf.VPos + f.Locals, f.VPos);
         dump("sp_offset", CurrentSpOfs);
