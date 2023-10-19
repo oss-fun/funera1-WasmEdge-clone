@@ -187,45 +187,69 @@ public:
   }
   
   struct CtrlInfo {
-    AST::InstrView::iterator Iter;
+    // AST::InstrView::iterator Iter;
+    uint32_t BeginAddrOfs;
+    uint32_t TargetAddrOfs;
+    uint32_t SpOfs;
+    uint32_t ResultCells;
   };
 
-  std::vector<struct CtrlInfo> getCtrlStack(const AST::InstrView::iterator PCNow) {
+  std::vector<struct CtrlInfo> getCtrlStack(const AST::InstrView::iterator PCNow, const Runtime::Instance::FunctionInstance &Func, const std::vector<uint32_t> &WamrCellSums) {
     std::vector<struct CtrlInfo> CtrlStack;
     
     IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
     assert(IterMigrator);
 
     struct SourceLoc Data = IterMigrator[PCNow];
-    AST::InstrView::iterator It = PCNow;
+    AST::InstrView::iterator PCStart = Func.getInstrs();
+    AST::InstrView::iterator PCEnd = Func.getInstrs().end();
+    AST::InstrView::iterator PC = PCStart;
+    // AST::InstrView::iterator It = PCNow;
     
-    // プログラムカウンタを関数の先頭に戻す
-    It -= Data.Offset;
-    
-    auto CtrlPush = [&](const AST::InstrView::iterator It) {
-      struct CtrlInfo info = CtrlInfo {It};
-      CtrlStack.push_back(info);
+    auto CtrlPush = [&](uint32_t BeginAddrOfs, uint32_t TargetAddrOfs, uint32_t SpOfs, uint32_t ResultCells) {
+      CtrlStack.emplace_back(BeginAddrOfs, TargetAddrOfs, SpOfs, ResultCells);
     };
-
+    
     auto CtrlPop = [&]() {
       CtrlStack.pop_back();
     };
     
     // 関数ブロックを一番最初にpushする
     // ダミーブロックぽさがすこしあるので、適当に入れる（ちゃんとやると、target_addrに関数の一番最後のアドレスを入れる必要があり、無駄が増えるため）
-    CtrlPush(It);
+    
+    uint32_t BeginAddrOfs, TargetAddrOfs, SpOfs, ResultCells;
+    TargetAddrOfs = PCEnd->getOffset() - PCStart->getOffset();
+    ResultCells = WamrCellSums[PC->]
+    CtrlPush(0, TargetAddrOfs-1, 0, ResultCells);
+          // const AST::Instruction &Instr = *info.Iter;
+          // const AST::InstrView::iterator BeginAddr = info.Iter;
+          // const AST::InstrView::iterator TargetAddr = BeginAddr + Instr.getJumpEnd(); // TODO: TargetAddrの位置をちゃんと調べる
+          // std::cout << "[DEBUG]BeginAddr OpCode: " << (int)(BeginAddr->getOpCode()) << std::endl;
+          // std::cout << "[DEBUG]TargetAddr OpCode: " << (int)(TargetAddr->getOpCode()) << std::endl;
+
+          // uint32_t sp_offset = WamrCellSumStack[Instr.getJump().StackEraseBegin]; 
+          // uint32_t result_cells = WamrCellSumStack[Instr.getJump().StackEraseEnd];
+
+          // // cps->begin_addr_offset
+          // fout << (BeginAddr+1)->getOffset() - StartIt->getOffset() << std::endl;
+          // // cps->target_addr_offset
+          // fout << (TargetAddr+1)->getOffset() - StartIt->getOffset() << std::endl;
+          // // csp->sp_offset
+          // fout << sp_offset << std::endl;
+          // // csp->cell_num
+          // fout << result_cells << std::endl;
 
     // 命令をなめる
-    while (It < PCNow) {
-      const AST::Instruction &Instr = *It;
-      switch (Instr.getOpCode()) {
+    while (PC < PCNow) {
+      switch (PC->getOpCode()) {
         // push
         case OpCode::Block:
         case OpCode::Loop:
         case OpCode::If:
-        case OpCode::Call:
-        case OpCode::Return_call:
-          CtrlPush(It);
+          BeginAddrOfs = (PC+1)->getOffset() - PCStart->getOffset();
+          TargetAddrOfs = (PC + PC->getJumpEnd())->getOffset() - PCStart->getOffset();
+          SpOfs = WamrCellSums[PC->getJump().StackEraseBegin];
+          CtrlPush(PC);
           break;
         // pop
         case OpCode::End:
@@ -235,7 +259,7 @@ public:
           break;
       }
 
-      It++;
+      PC++;
     }
     
     return CtrlStack;
@@ -248,15 +272,16 @@ public:
     std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
     std::vector<Value> ValueStack = StackMgr.getValueStack();
     std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
+
     // TypeStackからWAMRのセルの個数累積和みたいにする
     // 累積和 1-indexed
-    std::vector<uint32_t> WamrCellSumStack(TypeStack.size()+1, 0);
+    std::vector<uint32_t> WamrCellSums(TypeStack.size()+1, 0);
 
     IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
 
     // WamrCelSumStackの初期化
     for (uint32_t I = 0; I < TypeStack.size(); I++) {
-        WamrCellSumStack[I+1] = WamrCellSumStack[I] + (TypeStack[I] == 0 ? 1 : 2);
+        WamrCellSums[I+1] = WamrCellSums[I] + (TypeStack[I] == 0 ? 1 : 2);
     }
     std::ofstream fout;
     fout.open("wamr_frame.img", std::ios::trunc);
@@ -270,7 +295,7 @@ public:
     // WAMRは4bytesセルが何個でカウントするので、それに合わせてOffsetをdumpする
     // [Start, End]の区間のcell_numを取得
     auto getStackOffset = [&](uint32_t Start, uint32_t End) {
-      return WamrCellSumStack.at(End) - WamrCellSumStack.at(Start);
+      return WamrCellSums.at(End) - WamrCellSums.at(Start);
     };
 
     
@@ -292,9 +317,8 @@ public:
 
       Runtime::StackManager::Frame pf = (I > 0 ? FrameStack[I-1] : FrameStack[0]);
       Runtime::StackManager::Frame f = FrameStack[I];
-
-      CtrlStack = getCtrlStack(f.From);
       const Runtime::Instance::ModuleInstance *ModInst = f.Module;
+
 
       // dummpy frame
       if (ModInst == nullptr) {
@@ -304,14 +328,12 @@ public:
         dump("all_cell_num", 2, "");
       }
       else {
-        std::string_view ModName = ModInst->getModuleName();
-        fout << ModName << std::endl;
-        
         // debug: 関数インデックスの出力
         auto Data = IterMigrator[f.From];
 
         StartIt = f.From - Data.Offset;
-        Data = IterMigrator[f.From];
+        CtrlStack = getCtrlStack(f.From, ModInst->getFunc(Data.FuncIdx), WarmCellSums);
+
         CurrentIpOfs = (f.From+1)->getOffset() - StartIt->getOffset();
         // func_idx
         dump("func_idx", Data.FuncIdx);
@@ -364,8 +386,8 @@ public:
           std::cout << "[DEBUG]BeginAddr OpCode: " << (int)(BeginAddr->getOpCode()) << std::endl;
           std::cout << "[DEBUG]TargetAddr OpCode: " << (int)(TargetAddr->getOpCode()) << std::endl;
 
-          uint32_t sp_offset = WamrCellSumStack[Instr.getJump().StackEraseBegin]; 
-          uint32_t result_cells = WamrCellSumStack[Instr.getJump().StackEraseEnd];
+          uint32_t sp_offset = WamrCellSums[Instr.getJump().StackEraseBegin]; 
+          uint32_t result_cells = WamrCellSums[Instr.getJump().StackEraseEnd];
 
           // cps->begin_addr_offset
           fout << (BeginAddr+1)->getOffset() - StartIt->getOffset() << std::endl;
@@ -664,18 +686,13 @@ public:
     ValueStack.reserve(2048U);
     std::string ValueString;	
     /// TODO: ループ条件見直す	
-    // int cnt = 0;
     while(getline(ValueStream, ValueString)) {	
       // ValueStringが空の場合はエラー	
       assert(ValueString.size() > 0);	
 
-      // std::cout << "count " << cnt << std::endl;
-      // cnt++;
-      // std::cout << "restore value: 1" << std::endl;
       /// TODO: stoullは64bitまでしか受け取らないので、128bitの入力が来たら壊れる
       Runtime::StackManager::Value v = static_cast<uint128_t>(stou128(ValueString));	
       ValueStack.push_back(v);	
-      // std::cout << "restore value: 2" << std::endl;
     }	
 
     ValueStream.close();	

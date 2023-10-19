@@ -12,7 +12,7 @@ Expect<void> Executor::runLocalGetOp(Runtime::StackManager &StackMgr,
                                      uint32_t StackOffset) const noexcept {
   StackMgr.push(StackMgr.getTopN(StackOffset));
   StackMgr.getTypeTop() = StackMgr.getTypeTopN(StackOffset);
-  std::cout << "[DEBUG]push stack: type kind: " << +StackMgr.getTypeTop() << std::endl;
+  // std::cout << "[DEBUG]push stack: type kind: " << +StackMgr.getTypeTop() << std::endl;
   return {};
 }
 

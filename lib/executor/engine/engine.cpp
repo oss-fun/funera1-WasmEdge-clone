@@ -217,13 +217,13 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
 
     // Variable Instructions
     case OpCode::Local__get:
-      std::cout << "[DEBUG]local.get " << Instr.getTargetIndex() << std::endl;
+      // std::cout << "[DEBUG]local.get " << Instr.getTargetIndex() << std::endl;
       return runLocalGetOp(StackMgr, Instr.getStackOffset());
     case OpCode::Local__set:
-      std::cout << "[DEBUG]local.get " << Instr.getTargetIndex() << std::endl;
+      // std::cout << "[DEBUG]local.get " << Instr.getTargetIndex() << std::endl;
       return runLocalSetOp(StackMgr, Instr.getStackOffset());
     case OpCode::Local__tee:
-      std::cout << "[DEBUG]local.get " << Instr.getTargetIndex() << std::endl;
+      // std::cout << "[DEBUG]local.get " << Instr.getTargetIndex() << std::endl;
       return runLocalTeeOp(StackMgr, Instr.getStackOffset());
     case OpCode::Global__get:
       return runGlobalGetOp(StackMgr, Instr.getTargetIndex());
@@ -1927,8 +1927,8 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     }
 
      
-    OpCode Code = PC->getOpCode();
-    std::cout << "[DEBUG]OpCode: 0x" << std::hex << (uint16_t)Code << std::dec << std::endl;
+    // OpCode Code = PC->getOpCode();
+    // std::cout << "[DEBUG]OpCode: 0x" << std::hex << (uint16_t)Code << std::dec << std::endl;
     if (auto Res = Dispatch(); !Res) {
       SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
       std::cout << "[WASMEDGE ERROR] PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;
