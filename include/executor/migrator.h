@@ -407,7 +407,7 @@ public:
     };
 
     
-    std::vector<struct CtrlInfo> CurrentCtrlStack;
+    std::vector<struct CtrlInfo> CtrlStack;
     uint32_t CurrentIpOfs;
     uint32_t CurrentSpOfs;
     uint32_t CurrentCspOfs;
@@ -422,16 +422,10 @@ public:
       // I = 1と2のときに__start()を持ってて重複してる。かつI=1の方はWAMRでは使わないので排除
       if (I == 1) continue;
 
-      Runtime::StackManager::Frame pf = FrameStack[0];
-      if (I > 0) pf = FrameStack[I-1];
+      Runtime::StackManager::Frame pf = (I > 0 ? FrameStack[I-1] : FrameStack[0]);
       Runtime::StackManager::Frame f = FrameStack[I];
-      std::vector<struct CtrlInfo> CtrlStack = getCtrlStack(f.From);
+      CtrlStack = getCtrlStack(f.From);
       const Runtime::Instance::ModuleInstance *ModInst = f.Module;
-
-      // Last
-      if (I == FrameStack.size() - 1) {
-        CurrentCtrlStack = CtrlStack;
-      }
 
       // dummpy frame
       if (ModInst == nullptr) {
@@ -456,14 +450,11 @@ public:
         // sp_offset
         CurrentSpOfs = getStackOffset(pf.VPos + f.Locals, f.VPos);
         dump("sp_offset", CurrentSpOfs);
-
         // csp_offset
         CurrentCspOfs = CtrlStack.size();
         dump("csp_offset", CurrentCspOfs);
-        
         // lp (params, locals)
         dump("lp_num", pf.Locals, "");
-
         fout << "lp(params, locals)" << std::endl;
         for (uint32_t I = pf.VPos-pf.Locals; I < pf.VPos; I++) {
           Value V = ValueStack[I];
@@ -492,10 +483,6 @@ public:
         fout << std::endl;
         
         // for csp_num
-        //  cps->begin_addr_offset
-        //  cps->target_addr_offset
-        //  cps->sp_offset
-        //  cps->cell_num (= resultのcellの数)
         dump("csp_num", CtrlStack.size(), "");
 
         fout << "csp" << std::endl;
@@ -510,14 +497,11 @@ public:
           // cps->begin_addr_offset
           struct SourceLoc Begin = IterMigrator[BeginAddr];
           fout << Begin.Offset << std::endl;
-
           // cps->target_addr_offset
           struct SourceLoc Target = IterMigrator[TargetAddr];
           fout << Target.Offset << std::endl;
-          
           // csp->sp_offset
           fout << sp_offset << std::endl;
-          
           // csp->cell_num
           fout << result_cells << std::endl;
         }
@@ -532,26 +516,21 @@ public:
 
     // ip_ofs
     dump("ip_ofs", CurrentIpOfs);
-
     // sp_ofs
     dump("sp_ofs", CurrentSpOfs);
-
     // csp_ofs
     dump("csp_ofs", CurrentCspOfs);
 
-    struct CtrlInfo CtrlTop = CurrentCtrlStack.back();
+    struct CtrlInfo CtrlTop = CtrlStack.back();
     const AST::Instruction& Instr = *(CtrlTop.Iter);
-
     // else_addr
     AST::InstrView::iterator ElseAddr = CtrlTop.Iter + Instr.getJumpElse();
     auto Data = IterMigrator[ElseAddr];
     dump("else_addr", Data.Offset);
-
     // end_addr
     AST::InstrView::iterator EndAddr = CtrlTop.Iter + Instr.getJumpEnd();
     Data = IterMigrator[EndAddr];
     dump("end_addr", Data.Offset);
-    
     // done flag
     dump("done_flag", 1);
 
