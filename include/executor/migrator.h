@@ -274,6 +274,7 @@ public:
     };
 
     
+    AST::InstrView::iterator StartIt;
     std::vector<struct CtrlInfo> CtrlStack;
     uint32_t CurrentIpOfs;
     uint32_t CurrentSpOfs;
@@ -291,6 +292,7 @@ public:
 
       Runtime::StackManager::Frame pf = (I > 0 ? FrameStack[I-1] : FrameStack[0]);
       Runtime::StackManager::Frame f = FrameStack[I];
+
       CtrlStack = getCtrlStack(f.From);
       const Runtime::Instance::ModuleInstance *ModInst = f.Module;
 
@@ -308,8 +310,9 @@ public:
         // debug: 関数インデックスの出力
         auto Data = IterMigrator[f.From];
 
+        StartIt = f.From - Data.Offset;
         Data = IterMigrator[f.From];
-        CurrentIpOfs = (f.From+1)->getOffset() - (f.From-Data.Offset)->getOffset();
+        CurrentIpOfs = (f.From+1)->getOffset() - StartIt->getOffset();
         // func_idx
         dump("func_idx", Data.FuncIdx);
         // ip_offset
@@ -357,16 +360,17 @@ public:
           struct CtrlInfo info = CtrlStack[I];
           const AST::Instruction &Instr = *info.Iter;
           const AST::InstrView::iterator BeginAddr = info.Iter;
-          const AST::InstrView::iterator TargetAddr = BeginAddr + Instr.getJump().PCOffset; // TODO: TargetAddrの位置をちゃんと調べる
+          const AST::InstrView::iterator TargetAddr = BeginAddr + Instr.getJumpEnd(); // TODO: TargetAddrの位置をちゃんと調べる
+          std::cout << "[DEBUG]BeginAddr OpCode: " << (int)(BeginAddr->getOpCode()) << std::endl;
+          std::cout << "[DEBUG]TargetAddr OpCode: " << (int)(TargetAddr->getOpCode()) << std::endl;
+
           uint32_t sp_offset = WamrCellSumStack[Instr.getJump().StackEraseBegin]; 
           uint32_t result_cells = WamrCellSumStack[Instr.getJump().StackEraseEnd];
 
           // cps->begin_addr_offset
-          struct SourceLoc Begin = IterMigrator[BeginAddr];
-          fout << Begin.Offset << std::endl;
+          fout << (BeginAddr+1)->getOffset() - StartIt->getOffset() << std::endl;
           // cps->target_addr_offset
-          struct SourceLoc Target = IterMigrator[TargetAddr];
-          fout << Target.Offset << std::endl;
+          fout << (TargetAddr+1)->getOffset() - StartIt->getOffset() << std::endl;
           // csp->sp_offset
           fout << sp_offset << std::endl;
           // csp->cell_num
@@ -534,7 +538,8 @@ public:
       std::cout << "\x1b[31m";
       std::cout << "FuncIdx[" << iterString << "]: out of range" << std::endl;
       std::cout << "\x1b[m";
-      // return Unexpect(e);
+      // return Unexpect(e);        // Data = convertIterForWamr(f.From);
+        // const AST::Instruction &Instr = *(f.From);
     }
     // Offset
     getline(iterStream, iterString);
