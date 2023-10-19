@@ -206,7 +206,6 @@ public:
     AST::InstrView::iterator PC = PCStart;
     
     uint32_t BaseAddr = PCStart->getOffset();
-    // AST::InstrView::iterator It = PCNow;
 
     auto CtrlPush = [&](AST::InstrView::iterator Begin, AST::InstrView::iterator Target, uint32_t SpOfs) {
       uint32_t BeginOfs = Begin->getOffset() - BaseAddr;
@@ -226,7 +225,7 @@ public:
     // 関数ブロックを一番最初にpushする
     // ダミーブロックぽさがすこしあるので、適当に入れる（ちゃんとやると、target_addrに関数の一番最後のアドレスを入れる必要があり、無駄が増えるため）
     uint32_t SpOfs;
-    CtrlPush(PCStart, PCEnd, 0);
+    CtrlPush(PCStart, PCEnd-1, 0);
 
     // 命令をなめる
     while (PC < PCNow) {
@@ -234,12 +233,12 @@ public:
         // push
         case OpCode::Block:
         case OpCode::If:
-          // SpOfs = WamrCellSums[PC->getJump().StackEraseBegin];
-          // CtrlPush(PC, PC+PC->getJumpEnd(), SpOfs);
+          SpOfs = WamrCellSums[PC->getJump().StackEraseBegin];
+          CtrlPush(PC+1, PC+PC->getJumpEnd(), SpOfs);
           break;
         case OpCode::Loop:
           SpOfs = WamrCellSums[PC->getJump().StackEraseBegin];
-          CtrlPush(PC, PC, SpOfs);
+          CtrlPush(PC+1, PC+1, SpOfs);
           break;
 
         // pop
@@ -376,14 +375,6 @@ public:
         fout << "csp" << std::endl;
         for (uint32_t I = 0; I < CtrlStack.size(); I++) {
           struct CtrlInfo info = CtrlStack[I];
-          // const AST::Instruction &Instr = *info.Iter;
-          // const AST::InstrView::iterator BeginAddr = info.Iter;
-          // const AST::InstrView::iterator TargetAddr = BeginAddr + Instr.getJumpEnd(); // TODO: TargetAddrの位置をちゃんと調べる
-          // std::cout << "[DEBUG]BeginAddr OpCode: " << (int)(BeginAddr->getOpCode()) << std::endl;
-          // std::cout << "[DEBUG]TargetAddr OpCode: " << (int)(TargetAddr->getOpCode()) << std::endl;
-
-          // uint32_t sp_offset = WamrCellSums[Instr.getJump().StackEraseBegin]; 
-          // uint32_t result_cells = WamrCellSums[Instr.getJump().StackEraseEnd];
 
           // cps->begin_addr_offset
           fout << info.BeginAddrOfs << std::endl;
