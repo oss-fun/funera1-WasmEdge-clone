@@ -77,6 +77,7 @@ public:
         // todo
         break;
       case OpCode::Block:
+        break;
       case OpCode::Loop:
       case OpCode::If:
       case OpCode::Br:
@@ -342,7 +343,12 @@ public:
     auto CtrlPop = [&]() {
       CtrlStack.pop_back();
     };
+    
+    // 関数ブロックを一番最初にpushする
+    // ダミーブロックぽさがすこしあるので、適当に入れる（ちゃんとやると、target_addrに関数の一番最後のアドレスを入れる必要があり、無駄が増えるため）
+    CtrlPush(It);
 
+    // 命令をなめる
     while (It < PCNow) {
       const AST::Instruction &Instr = *It;
       switch (Instr.getOpCode()) {
@@ -356,10 +362,6 @@ public:
           break;
         // pop
         case OpCode::End:
-        // case OpCode::Br:
-        // case OpCode::Br_if:
-        // case OpCode::Br_table:
-          // TODO: Br系は抜けるブロックの分だけPOPする必要がある
           CtrlPop();
           break;
         default:
@@ -391,6 +393,12 @@ public:
     }
     std::ofstream fout;
     fout.open("wamr_frame.img", std::ios::trunc);
+    
+    auto dump = [&](std::string desc, auto val, std::string end = "\n") {
+      fout << desc << std::endl;
+      fout << val << std::endl;
+      fout << end;
+    };
     
     // WAMRは4bytesセルが何個でカウントするので、それに合わせてOffsetをdumpする
     // [Start, End]の区間のcell_numを取得
@@ -427,13 +435,10 @@ public:
 
       // dummpy frame
       if (ModInst == nullptr) {
-        fout << "func_idx" << std::endl;
-        fout << -1 << std::endl;
-        fout << std::endl;
+        dump("func_idx", -1);
         // TODO: dummy frameのall_cell_numいる
         // fout << all_cell_num << std::endl;
-        fout << "all_cell_num" << std::endl;
-        fout << 2 << std::endl;
+        dump("all_cell_num", 2, "");
       }
       else {
         std::string_view ModName = ModInst->getModuleName();
@@ -442,32 +447,23 @@ public:
         // debug: 関数インデックスの出力
         auto Data = IterMigrator[f.From];
 
-        // ip_offset
         Data = convertIterForWamr(f.From);
         CurrentIpOfs = Data.Offset;
-        fout << "func_idx" << std::endl;
-        fout << Data.FuncIdx << std::endl;
-        fout << std::endl;
-
-        fout << "ip_offset" << std::endl;
-        fout << Data.Offset << std::endl;
-        fout << std::endl;
-
+        // func_idx
+        dump("func_idx", Data.FuncIdx);
+        // ip_offset
+        dump("ip_offset", Data.Offset);
         // sp_offset
         CurrentSpOfs = getStackOffset(pf.VPos + f.Locals, f.VPos);
-        fout << "sp_offset" << std::endl;
-        fout << CurrentSpOfs << std::endl;
-        fout << std::endl;
+        dump("sp_offset", CurrentSpOfs);
 
         // csp_offset
         CurrentCspOfs = CtrlStack.size();
-        fout << "csp_offset" << std::endl;
-        fout << CurrentCspOfs << std::endl;
-        fout << std::endl;
+        dump("csp_offset", CurrentCspOfs);
         
         // lp (params, locals)
-        fout << "lp_num" << std::endl;
-        fout << pf.Locals << std::endl;
+        dump("lp_num", pf.Locals, "");
+
         fout << "lp(params, locals)" << std::endl;
         for (uint32_t I = pf.VPos-pf.Locals; I < pf.VPos; I++) {
           Value V = ValueStack[I];
@@ -481,8 +477,8 @@ public:
         fout << std::endl;
 
         // stack
-        fout << "stack_num" << std::endl;
-        fout << (f.VPos - f.Locals) - pf.VPos << std::endl;
+        dump("stack_num", (f.VPos-f.Locals) - pf.VPos, "");
+
         fout << "stack" << std::endl;
         for (uint32_t I = pf.VPos; I < f.VPos-f.Locals; I++) {
           Value V = ValueStack[I];
@@ -495,14 +491,13 @@ public:
         }
         fout << std::endl;
         
-
         // for csp_num
         //  cps->begin_addr_offset
         //  cps->target_addr_offset
         //  cps->sp_offset
         //  cps->cell_num (= resultのcellの数)
-        fout << "csp_num" << std::endl;
-        fout << CtrlStack.size() << std::endl;
+        dump("csp_num", CtrlStack.size(), "");
+
         fout << "csp" << std::endl;
         for (uint32_t I = 0; I < CtrlStack.size(); I++) {
           struct CtrlInfo info = CtrlStack[I];
@@ -536,19 +531,13 @@ public:
     fout.open("wamr_addrs.img", std::ios::trunc);
 
     // ip_ofs
-    fout << "ip_ofs" << std::endl;
-    fout << CurrentIpOfs << std::endl;
-    fout << std::endl;
+    dump("ip_ofs", CurrentIpOfs);
 
     // sp_ofs
-    fout << "sp_ofs" << std::endl;
-    fout << CurrentSpOfs << std::endl;
-    fout << std::endl;
+    dump("sp_ofs", CurrentSpOfs);
 
     // csp_ofs
-    fout << "csp_ofs" << std::endl;
-    fout << CurrentCspOfs << std::endl;
-    fout << std::endl;
+    dump("csp_ofs", CurrentCspOfs);
 
     struct CtrlInfo CtrlTop = CurrentCtrlStack.back();
     const AST::Instruction& Instr = *(CtrlTop.Iter);
@@ -556,21 +545,15 @@ public:
     // else_addr
     AST::InstrView::iterator ElseAddr = CtrlTop.Iter + Instr.getJumpElse();
     auto Data = IterMigrator[ElseAddr];
-    fout << "else_addr" << std::endl;
-    fout << Data.Offset << std::endl;
-    fout << std::endl;
+    dump("else_addr", Data.Offset);
 
     // end_addr
     AST::InstrView::iterator EndAddr = CtrlTop.Iter + Instr.getJumpEnd();
     Data = IterMigrator[EndAddr];
-    fout << "end_addr" << std::endl;
-    fout << Data.Offset << std::endl;
-    fout << std::endl;
+    dump("end_addr", Data.Offset);
     
     // done flag
-    fout << "done_flag" << std::endl;
-    fout << 1 << std::endl;
-    fout << std::endl;
+    dump("done_flag", 1);
 
     fout.close();
   }
