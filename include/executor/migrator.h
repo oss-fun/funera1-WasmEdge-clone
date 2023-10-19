@@ -190,67 +190,58 @@ public:
     // AST::InstrView::iterator Iter;
     uint32_t BeginAddrOfs;
     uint32_t TargetAddrOfs;
+    uint32_t ElseAddrOfs;
     uint32_t SpOfs;
     uint32_t ResultCells;
   };
 
-  std::vector<struct CtrlInfo> getCtrlStack(const AST::InstrView::iterator PCNow, const Runtime::Instance::FunctionInstance &Func, const std::vector<uint32_t> &WamrCellSums) {
+  std::vector<struct CtrlInfo> getCtrlStack(const AST::InstrView::iterator PCNow, Runtime::Instance::FunctionInstance *Func, const std::vector<uint32_t> &WamrCellSums) {
     std::vector<struct CtrlInfo> CtrlStack;
     
     IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
     assert(IterMigrator);
 
-    struct SourceLoc Data = IterMigrator[PCNow];
-    AST::InstrView::iterator PCStart = Func.getInstrs();
-    AST::InstrView::iterator PCEnd = Func.getInstrs().end();
+    AST::InstrView::iterator PCStart = Func->getInstrs().begin();
+    AST::InstrView::iterator PCEnd = Func->getInstrs().end();
     AST::InstrView::iterator PC = PCStart;
-    // AST::InstrView::iterator It = PCNow;
     
-    auto CtrlPush = [&](uint32_t BeginAddrOfs, uint32_t TargetAddrOfs, uint32_t SpOfs, uint32_t ResultCells) {
-      CtrlStack.emplace_back(BeginAddrOfs, TargetAddrOfs, SpOfs, ResultCells);
+    uint32_t BaseAddr = PCStart->getOffset();
+    // AST::InstrView::iterator It = PCNow;
+
+    auto CtrlPush = [&](AST::InstrView::iterator Begin, AST::InstrView::iterator Target, uint32_t SpOfs) {
+      uint32_t BeginOfs = Begin->getOffset() - BaseAddr;
+      uint32_t TargetOfs = Target->getOffset() - BaseAddr;
+      uint32_t ElseOfs = (Begin + Begin->getJumpElse())->getOffset() - BaseAddr;
+      CtrlStack.push_back({BeginOfs, TargetOfs, ElseOfs, SpOfs, 0});
     };
     
     auto CtrlPop = [&]() {
+      if (CtrlStack.size() == 0) {
+        std::cerr << "CtrlStack is empty" << std::endl;
+        return;
+      }
       CtrlStack.pop_back();
     };
     
     // 関数ブロックを一番最初にpushする
     // ダミーブロックぽさがすこしあるので、適当に入れる（ちゃんとやると、target_addrに関数の一番最後のアドレスを入れる必要があり、無駄が増えるため）
-    
-    uint32_t BeginAddrOfs, TargetAddrOfs, SpOfs, ResultCells;
-    TargetAddrOfs = PCEnd->getOffset() - PCStart->getOffset();
-    ResultCells = WamrCellSums[PC->]
-    CtrlPush(0, TargetAddrOfs-1, 0, ResultCells);
-          // const AST::Instruction &Instr = *info.Iter;
-          // const AST::InstrView::iterator BeginAddr = info.Iter;
-          // const AST::InstrView::iterator TargetAddr = BeginAddr + Instr.getJumpEnd(); // TODO: TargetAddrの位置をちゃんと調べる
-          // std::cout << "[DEBUG]BeginAddr OpCode: " << (int)(BeginAddr->getOpCode()) << std::endl;
-          // std::cout << "[DEBUG]TargetAddr OpCode: " << (int)(TargetAddr->getOpCode()) << std::endl;
-
-          // uint32_t sp_offset = WamrCellSumStack[Instr.getJump().StackEraseBegin]; 
-          // uint32_t result_cells = WamrCellSumStack[Instr.getJump().StackEraseEnd];
-
-          // // cps->begin_addr_offset
-          // fout << (BeginAddr+1)->getOffset() - StartIt->getOffset() << std::endl;
-          // // cps->target_addr_offset
-          // fout << (TargetAddr+1)->getOffset() - StartIt->getOffset() << std::endl;
-          // // csp->sp_offset
-          // fout << sp_offset << std::endl;
-          // // csp->cell_num
-          // fout << result_cells << std::endl;
+    uint32_t SpOfs;
+    CtrlPush(PCStart, PCEnd, 0);
 
     // 命令をなめる
     while (PC < PCNow) {
       switch (PC->getOpCode()) {
         // push
         case OpCode::Block:
-        case OpCode::Loop:
         case OpCode::If:
-          BeginAddrOfs = (PC+1)->getOffset() - PCStart->getOffset();
-          TargetAddrOfs = (PC + PC->getJumpEnd())->getOffset() - PCStart->getOffset();
-          SpOfs = WamrCellSums[PC->getJump().StackEraseBegin];
-          CtrlPush(PC);
+          // SpOfs = WamrCellSums[PC->getJump().StackEraseBegin];
+          // CtrlPush(PC, PC+PC->getJumpEnd(), SpOfs);
           break;
+        case OpCode::Loop:
+          SpOfs = WamrCellSums[PC->getJump().StackEraseBegin];
+          CtrlPush(PC, PC, SpOfs);
+          break;
+
         // pop
         case OpCode::End:
           CtrlPop();
@@ -332,7 +323,12 @@ public:
         auto Data = IterMigrator[f.From];
 
         StartIt = f.From - Data.Offset;
-        CtrlStack = getCtrlStack(f.From, ModInst->getFunc(Data.FuncIdx), WarmCellSums);
+        auto Res = ModInst->getFunc(Data.FuncIdx);
+        if (!Res) {
+          std::cout << "FuncIdx is not correct" << std::endl;
+        }
+        Runtime::Instance::FunctionInstance* Func = Res.value();
+        CtrlStack = getCtrlStack(f.From, Func, WamrCellSums);
 
         CurrentIpOfs = (f.From+1)->getOffset() - StartIt->getOffset();
         // func_idx
@@ -380,23 +376,23 @@ public:
         fout << "csp" << std::endl;
         for (uint32_t I = 0; I < CtrlStack.size(); I++) {
           struct CtrlInfo info = CtrlStack[I];
-          const AST::Instruction &Instr = *info.Iter;
-          const AST::InstrView::iterator BeginAddr = info.Iter;
-          const AST::InstrView::iterator TargetAddr = BeginAddr + Instr.getJumpEnd(); // TODO: TargetAddrの位置をちゃんと調べる
-          std::cout << "[DEBUG]BeginAddr OpCode: " << (int)(BeginAddr->getOpCode()) << std::endl;
-          std::cout << "[DEBUG]TargetAddr OpCode: " << (int)(TargetAddr->getOpCode()) << std::endl;
+          // const AST::Instruction &Instr = *info.Iter;
+          // const AST::InstrView::iterator BeginAddr = info.Iter;
+          // const AST::InstrView::iterator TargetAddr = BeginAddr + Instr.getJumpEnd(); // TODO: TargetAddrの位置をちゃんと調べる
+          // std::cout << "[DEBUG]BeginAddr OpCode: " << (int)(BeginAddr->getOpCode()) << std::endl;
+          // std::cout << "[DEBUG]TargetAddr OpCode: " << (int)(TargetAddr->getOpCode()) << std::endl;
 
-          uint32_t sp_offset = WamrCellSums[Instr.getJump().StackEraseBegin]; 
-          uint32_t result_cells = WamrCellSums[Instr.getJump().StackEraseEnd];
+          // uint32_t sp_offset = WamrCellSums[Instr.getJump().StackEraseBegin]; 
+          // uint32_t result_cells = WamrCellSums[Instr.getJump().StackEraseEnd];
 
           // cps->begin_addr_offset
-          fout << (BeginAddr+1)->getOffset() - StartIt->getOffset() << std::endl;
+          fout << info.BeginAddrOfs << std::endl;
           // cps->target_addr_offset
-          fout << (TargetAddr+1)->getOffset() - StartIt->getOffset() << std::endl;
+          fout << info.TargetAddrOfs << std::endl;
           // csp->sp_offset
-          fout << sp_offset << std::endl;
+          fout << info.SpOfs << std::endl;
           // csp->cell_num
-          fout << result_cells << std::endl;
+          fout << info.ResultCells << std::endl;
         }
       }
       fout << "===" << std::endl;
@@ -415,15 +411,10 @@ public:
     dump("csp_ofs", CurrentCspOfs);
 
     struct CtrlInfo CtrlTop = CtrlStack.back();
-    const AST::Instruction& Instr = *(CtrlTop.Iter);
     // else_addr
-    AST::InstrView::iterator ElseAddr = CtrlTop.Iter + Instr.getJumpElse();
-    auto Data = IterMigrator[ElseAddr];
-    dump("else_addr", Data.Offset);
+    dump("else_addr", CtrlTop.ElseAddrOfs);
     // end_addr
-    AST::InstrView::iterator EndAddr = CtrlTop.Iter + Instr.getJumpEnd();
-    Data = IterMigrator[EndAddr];
-    dump("end_addr", Data.Offset);
+    dump("end_addr", CtrlTop.TargetAddrOfs);
     // done flag
     dump("done_flag", 1);
 
