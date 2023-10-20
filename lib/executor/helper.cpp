@@ -155,6 +155,7 @@ Executor::enterFunction(Runtime::StackManager &StackMgr,
 
     // Push returns back to stack.
     for (uint32_t I = 0; I < Rets.size(); ++I) {
+      std::cout << "[DEBUG]enterFunction::isCompiledFunction" << std::endl;
       StackMgr.push(Rets[I]);
     }
 
@@ -168,13 +169,17 @@ Executor::enterFunction(Runtime::StackManager &StackMgr,
     for (auto &Def : Func.getLocals()) {
       for (uint32_t I = 0; I < Def.first; I++) {
         if (Def.second == ValType::I32 || Def.second == ValType::F32) {
-          StackMgr.push<uint32_t>(ValueFromType(Def.second).get<uint32_t>());
+          StackMgr.push(ValueFromType(Def.second));
+          StackMgr.getTypeTop() = 0;
         }
         else if (Def.second == ValType::I64 || Def.second == ValType::F64) {
-          StackMgr.push<uint64_t>(ValueFromType(Def.second).get<uint64_t>());
+          StackMgr.push(ValueFromType(Def.second));
+          StackMgr.getTypeTop() = 1;
         }
         else {
           StackMgr.push(ValueFromType(Def.second));
+          std::cerr << "[ERROR]unsupported 128bit value" << std::endl;
+          exit(1);
         }
       }
     }

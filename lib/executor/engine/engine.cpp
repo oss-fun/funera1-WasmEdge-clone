@@ -204,14 +204,20 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     case OpCode::Select_t: {
       // Pop the i32 value and select values from stack.
       ValVariant CondVal = StackMgr.pop();
+      const uint8_t &T2 = StackMgr.getTypeTop();
       ValVariant Val2 = StackMgr.pop();
+      const uint8_t &T1 = StackMgr.getTypeTop();
       ValVariant Val1 = StackMgr.pop();
+      
+      // std::cout << "[DEBUG] Enter Select, SelectT" << std::endl;
 
       // Select the value.
       if (CondVal.get<uint32_t>() == 0) {
         StackMgr.push(Val2);
+        StackMgr.getTypeTop() = T2;
       } else {
         StackMgr.push(Val1);
+        StackMgr.getTypeTop() = T1;
       }
       return {};
     }
@@ -1928,8 +1934,8 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     }
 
      
-    OpCode Code = PC->getOpCode();
-    std::cout << "[DEBUG]OpCode: 0x" << std::hex << (uint16_t)Code << std::dec << std::endl;
+    // OpCode Code = PC->getOpCode();
+    // std::cout << "[DEBUG]OpCode: 0x" << std::hex << (uint16_t)Code << std::dec << std::endl;
     if (auto Res = Dispatch(); !Res) {
       SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
       std::cout << "[WASMEDGE ERROR] PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;

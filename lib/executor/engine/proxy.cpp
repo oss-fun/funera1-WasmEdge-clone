@@ -83,6 +83,9 @@ Expect<void> Executor::trap(Runtime::StackManager &,
 Expect<void> Executor::call(Runtime::StackManager &StackMgr,
                             const uint32_t FuncIdx, const ValVariant *Args,
                             ValVariant *Rets) noexcept {
+  
+  std::cout << "[DEBUG]enter Executor::call" << std::endl;
+
   const auto *ModInst = StackMgr.getModule();
   const auto *FuncInst = *ModInst->getFunc(FuncIdx);
   const auto &FuncType = FuncInst->getFuncType();
