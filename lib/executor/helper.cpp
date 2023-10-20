@@ -175,6 +175,8 @@ Executor::enterFunction(Runtime::StackManager &StackMgr,
         }
         else {
           StackMgr.push(ValueFromType(Def.second));
+          std::cerr << "[ERROR]unsupported 128bit value" << std::endl;
+          exit(1);
         }
       }
     }
