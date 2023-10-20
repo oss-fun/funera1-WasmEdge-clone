@@ -43,6 +43,7 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
 
   // Push arguments.
   for (auto &Val : Params) {
+    std::cout << "[DEBUG]runFunction Params: " << Val.get<uint128_t>() << std::endl;
     StackMgr.push(Val);
   }
 
@@ -203,14 +204,20 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     case OpCode::Select_t: {
       // Pop the i32 value and select values from stack.
       ValVariant CondVal = StackMgr.pop();
+      const uint8_t &T2 = StackMgr.getTypeTop();
       ValVariant Val2 = StackMgr.pop();
+      const uint8_t &T1 = StackMgr.getTypeTop();
       ValVariant Val1 = StackMgr.pop();
+      
+      // std::cout << "[DEBUG] Enter Select, SelectT" << std::endl;
 
       // Select the value.
       if (CondVal.get<uint32_t>() == 0) {
         StackMgr.push(Val2);
+        StackMgr.getTypeTop() = T2;
       } else {
         StackMgr.push(Val1);
+        StackMgr.getTypeTop() = T1;
       }
       return {};
     }
