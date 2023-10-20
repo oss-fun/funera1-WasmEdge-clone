@@ -1,0 +1,2 @@
+"/usr/bin/gcc-ar-11" cr libwasmedgeLoader.a CMakeFiles/wasmedgeLoader.dir/ast/module.cpp.o CMakeFiles/wasmedgeLoader.dir/ast/section.cpp.o CMakeFiles/wasmedgeLoader.dir/ast/description.cpp.o CMakeFiles/wasmedgeLoader.dir/ast/segment.cpp.o CMakeFiles/wasmedgeLoader.dir/ast/type.cpp.o CMakeFiles/wasmedgeLoader.dir/ast/expression.cpp.o CMakeFiles/wasmedgeLoader.dir/ast/instruction.cpp.o CMakeFiles/wasmedgeLoader.dir/loader.cpp.o
+"/usr/bin/gcc-ranlib-11" libwasmedgeLoader.a

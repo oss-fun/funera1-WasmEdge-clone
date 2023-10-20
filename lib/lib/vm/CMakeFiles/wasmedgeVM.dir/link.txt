@@ -1,0 +1,2 @@
+"/usr/bin/gcc-ar-11" cr libwasmedgeVM.a CMakeFiles/wasmedgeVM.dir/vm.cpp.o
+"/usr/bin/gcc-ranlib-11" libwasmedgeVM.a

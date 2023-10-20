@@ -93,7 +93,7 @@ public:
     else {
       TypeStack.push_back((uint8_t)2);
     }
-    // std::cout << "[DEBUG]push stack: type kind: " << +TypeStack.back() << std::endl;
+    std::cout << "[DEBUG]push stack: type kind: " << +TypeStack.back() << ", Pos: " << ValueStack.size() << " " << TypeStack.size() << std::endl;
   }
 
   /// Unsafe Pop and return the top entry.

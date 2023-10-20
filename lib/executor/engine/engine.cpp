@@ -43,6 +43,7 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
 
   // Push arguments.
   for (auto &Val : Params) {
+    std::cout << "[DEBUG]runFunction Params: " << Val.get<uint128_t>() << std::endl;
     StackMgr.push(Val);
   }
 
@@ -1927,8 +1928,8 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     }
 
      
-    // OpCode Code = PC->getOpCode();
-    // std::cout << "[DEBUG]OpCode: 0x" << std::hex << (uint16_t)Code << std::dec << std::endl;
+    OpCode Code = PC->getOpCode();
+    std::cout << "[DEBUG]OpCode: 0x" << std::hex << (uint16_t)Code << std::dec << std::endl;
     if (auto Res = Dispatch(); !Res) {
       SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
       std::cout << "[WASMEDGE ERROR] PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;

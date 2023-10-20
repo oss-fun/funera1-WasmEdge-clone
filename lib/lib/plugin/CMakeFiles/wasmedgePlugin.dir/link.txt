@@ -1,0 +1,2 @@
+"/usr/bin/gcc-ar-11" cr libwasmedgePlugin.a CMakeFiles/wasmedgePlugin.dir/plugin.cpp.o
+"/usr/bin/gcc-ranlib-11" libwasmedgePlugin.a
