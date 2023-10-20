@@ -10,18 +10,15 @@ namespace Executor {
 
 Expect<void> Executor::runLocalGetOp(Runtime::StackManager &StackMgr,
                                      uint32_t StackOffset) const noexcept {
-  std::cout << "[DEBUG]local.get from : " << StackMgr.getValueStack().size() - StackOffset << std::endl;
-
   StackMgr.push(StackMgr.getTopN(StackOffset));
-  StackMgr.getTypeTop() = StackMgr.getTypeTopN(StackOffset);
+  StackMgr.getTypeTop() = StackMgr.getTypeTopN(StackOffset+1);
 
-  std::cout << "[DEBUG]push stack: type kind: " << +StackMgr.getTypeTop() << ", Pos: " << StackMgr.getValueStack().size() << " " << StackMgr.getTypeStack().size() << std::endl;
+  // std::cout << "[DEBUG]push stack: type kind: " << +StackMgr.getTypeTop() << ", Pos: " << StackMgr.getValueStack().size() << " " << StackMgr.getTypeStack().size() << std::endl;
   return {};
 }
 
 Expect<void> Executor::runLocalSetOp(Runtime::StackManager &StackMgr,
                                      uint32_t StackOffset) const noexcept {
-  // StackMgr.getTypeTopN(StackOffset) = StackMgr.getTypeTop();
   StackMgr.getTopN(StackOffset - 1) = StackMgr.pop();
   return {};
 }
@@ -30,7 +27,6 @@ Expect<void> Executor::runLocalTeeOp(Runtime::StackManager &StackMgr,
                                      uint32_t StackOffset) const noexcept {
   const ValVariant &Val = StackMgr.getTop();
   StackMgr.getTopN(StackOffset) = Val;
-  // StackMgr.getTypeTopN(StackOffset) = StackMgr.getTypeTop();
   return {};
 }
 
@@ -51,7 +47,7 @@ Expect<void> Executor::runGlobalGetOp(Runtime::StackManager &StackMgr,
     StackMgr.push(GlobInst->getValue());
     StackMgr.getTypeTop() = 2;
   }
-  std::cout << "[DEBUG]push stack: type kind: " << +StackMgr.getTypeTop() << ", Pos: " << StackMgr.getValueStack().size() << " " << StackMgr.getTypeStack().size() << std::endl;
+  // std::cout << "[DEBUG]push stack: type kind: " << +StackMgr.getTypeTop() << ", Pos: " << StackMgr.getValueStack().size() << " " << StackMgr.getTypeStack().size() << std::endl;
   return {};
 }
 

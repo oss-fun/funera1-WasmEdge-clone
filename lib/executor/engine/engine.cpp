@@ -206,6 +206,8 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
       ValVariant CondVal = StackMgr.pop();
       ValVariant Val2 = StackMgr.pop();
       ValVariant Val1 = StackMgr.pop();
+      
+      std::cout << "[DEBUG] Enter Select, SelectT" << std::endl;
 
       // Select the value.
       if (CondVal.get<uint32_t>() == 0) {
@@ -1928,8 +1930,8 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     }
 
      
-    OpCode Code = PC->getOpCode();
-    std::cout << "[DEBUG]OpCode: 0x" << std::hex << (uint16_t)Code << std::dec << std::endl;
+    // OpCode Code = PC->getOpCode();
+    // std::cout << "[DEBUG]OpCode: 0x" << std::hex << (uint16_t)Code << std::dec << std::endl;
     if (auto Res = Dispatch(); !Res) {
       SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
       std::cout << "[WASMEDGE ERROR] PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;

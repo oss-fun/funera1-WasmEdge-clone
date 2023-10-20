@@ -173,14 +173,7 @@ public:
       Value v = Vals[I];
       int t = Typs[I];
       // 32bitのとき
-      if (t == 0) 
-        fout << v.get<uint32_t>() << std::endl;
-      else if (t == 1) 
-        fout << v.get<uint64_t>() << std::endl;
-      else {
-        std::cerr << "Type size is not 32bit or 64bit" << std::endl;
-        exit(1);
-      }
+      fout << t << ", " << v.get<uint128_t>() << std::endl;
     }
     
     fout.close();
