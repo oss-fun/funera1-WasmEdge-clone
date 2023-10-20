@@ -164,7 +164,7 @@ public:
       std::cerr << "TypStack size: " << Typs.size() << std::endl;
       exit(1);
     }
-
+    
     std::cout << "[DEBUG]TypeStack: [";
     for (size_t I = 0; I < Vals.size(); ++I) std::cout << +Typs[I];
     std::cout << "]" << std::endl;
@@ -172,15 +172,7 @@ public:
     for (size_t I = 0; I < Vals.size(); ++I) {
       Value v = Vals[I];
       int t = Typs[I];
-      // 32bitのとき
-      if (t == 0) 
-        fout << v.get<uint32_t>() << std::endl;
-      else if (t == 1) 
-        fout << v.get<uint64_t>() << std::endl;
-      else {
-        std::cerr << "Type size is not 32bit or 64bit" << std::endl;
-        exit(1);
-      }
+      fout << t << ", " << v.get<uint32_t>() << std::endl;
     }
     
     fout.close();

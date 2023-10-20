@@ -92,12 +92,16 @@ Executor::enterFunction(Runtime::StackManager &StackMgr,
 
       if (RetTypes[I] == ValType::I32 || RetTypes[I] == ValType::F32) {
         StackMgr.push<uint32_t>(std::move(R).get<uint32_t>());
+        StackMgr.pushType(sizeof(uint32_t));
       }
       else if (RetTypes[I] == ValType::I64 || RetTypes[I] == ValType::F64) {
         StackMgr.push<uint64_t>(std::move(R).get<uint64_t>());
+        StackMgr.pushType(sizeof(uint64_t));
       }
       else {
         StackMgr.push(std::move(R));
+        std::cerr << "[DEBUG]enterFunction::importFunc::push returns::valtype is not 32bit or 64bit" << std::endl;
+        exit(1);
       }
       
     }
@@ -156,6 +160,8 @@ Executor::enterFunction(Runtime::StackManager &StackMgr,
     // Push returns back to stack.
     for (uint32_t I = 0; I < Rets.size(); ++I) {
       StackMgr.push(Rets[I]);
+      std::cerr << "[DEBUG]enterFunction::compiledlFunc::push locals::unsupported" << std::endl;
+      exit(1);
     }
 
     // For compiled function case, the continuation will be the continuation
@@ -168,13 +174,17 @@ Executor::enterFunction(Runtime::StackManager &StackMgr,
     for (auto &Def : Func.getLocals()) {
       for (uint32_t I = 0; I < Def.first; I++) {
         if (Def.second == ValType::I32 || Def.second == ValType::F32) {
-          StackMgr.push<uint32_t>(ValueFromType(Def.second).get<uint32_t>());
+          StackMgr.push(ValueFromType(Def.second));
+          StackMgr.pushType(sizeof(uint32_t));
         }
         else if (Def.second == ValType::I64 || Def.second == ValType::F64) {
-          StackMgr.push<uint64_t>(ValueFromType(Def.second).get<uint64_t>());
+          StackMgr.push(ValueFromType(Def.second));
+          StackMgr.pushType(sizeof(uint64_t));
         }
         else {
           StackMgr.push(ValueFromType(Def.second));
+          std::cerr << "[DEBUG]enterFunction::normalFunc::push locals::valtype is not 32bit or 64bit" << std::endl;
+          exit(1);
         }
       }
     }

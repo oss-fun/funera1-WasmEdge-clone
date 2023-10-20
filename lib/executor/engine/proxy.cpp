@@ -91,8 +91,20 @@ Expect<void> Executor::call(Runtime::StackManager &StackMgr,
   const uint32_t ReturnsSize =
       static_cast<uint32_t>(FuncType.getReturnTypes().size());
 
+  const std::vector<ValType> ParamTypes = FuncType.getParamTypes();
   for (uint32_t I = 0; I < ParamsSize; ++I) {
-    StackMgr.push(Args[I]);
+    if (ParamTypes[I] == ValType::I32 || ParamTypes[I] == ValType::F32) {
+      StackMgr.push(Args[I]);
+      StackMgr.pushType(sizeof(uint32_t));
+    }
+    else if (ParamTypes[I] == ValType::I64 || ParamTypes[I] == ValType::F64) {
+      StackMgr.push(Args[I]);
+      StackMgr.pushType(sizeof(uint64_t));
+    }
+    else {
+      std::cerr << "[DEBUG]Executor.call::valtype is not 32bit or 64bit" << std::endl;
+      exit(1);
+    }
   }
 
   auto Instrs = FuncInst->getInstrs();
@@ -181,8 +193,20 @@ Executor::callIndirect(Runtime::StackManager &StackMgr, const uint32_t TableIdx,
   const uint32_t ReturnsSize =
       static_cast<uint32_t>(FuncType.getReturnTypes().size());
 
+  const std::vector<ValType> ParamTypes = FuncType.getParamTypes();
   for (uint32_t I = 0; I < ParamsSize; ++I) {
-    StackMgr.push(Args[I]);
+    if (ParamTypes[I] == ValType::I32 || ParamTypes[I] == ValType::F32) {
+      StackMgr.push(Args[I]);
+      StackMgr.pushType(sizeof(uint32_t));
+    }
+    else if (ParamTypes[I] == ValType::I64 || ParamTypes[I] == ValType::F64) {
+      StackMgr.push(Args[I]);
+      StackMgr.pushType(sizeof(uint64_t));
+    }
+    else {
+      std::cerr << "[DEBUG]Executor.call::valtype is not 32bit or 64bit" << std::endl;
+      exit(1);
+    }
   }
 
   auto Instrs = FuncInst->getInstrs();

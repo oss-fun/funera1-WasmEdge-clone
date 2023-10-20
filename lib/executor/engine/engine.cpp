@@ -44,6 +44,8 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
   // Push arguments.
   for (auto &Val : Params) {
     StackMgr.push(Val);
+    std::cerr << "[DEBUG]runFunction::unsupported Params" << std::endl;
+    exit(1);
   }
 
   // Enter and execute function.
@@ -209,8 +211,10 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
       // Select the value.
       if (CondVal.get<uint32_t>() == 0) {
         StackMgr.push(Val2);
+        StackMgr.pushType(sizeof(uint32_t));
       } else {
         StackMgr.push(Val1);
+        StackMgr.pushType(sizeof(uint32_t));
       }
       return {};
     }
@@ -856,6 +860,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     // SIMD Const Instructions
     case OpCode::V128__const:
       StackMgr.push(Instr.getNum());
+      StackMgr.pushType(sizeof(uint32_t));
       return {};
 
     // SIMD Shuffle Instructions

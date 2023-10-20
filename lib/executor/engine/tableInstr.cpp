@@ -15,6 +15,8 @@ Expect<void> Executor::runTableGetOp(Runtime::StackManager &StackMgr,
   // Get table[Idx] and push to Stack.
   if (auto Res = TabInst.getRefAddr(Idx)) {
     StackMgr.push(Res->get<UnknownRef>());
+    std::cerr << "[DEBUG]runTableGetOp::unsupport RefType" << std::endl;
+    exit(1);
   } else {
     spdlog::error(ErrInfo::InfoInstruction(Instr.getOpCode(), Instr.getOffset(),
                                            {Idx},
@@ -119,6 +121,7 @@ Executor::runTableSizeOp(Runtime::StackManager &StackMgr,
                          Runtime::Instance::TableInstance &TabInst) {
   // Push SZ = size to stack.
   StackMgr.push(TabInst.getSize());
+  StackMgr.pushType(sizeof(uint32_t));
   return {};
 }
 
