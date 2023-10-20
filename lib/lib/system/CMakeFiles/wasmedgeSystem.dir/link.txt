@@ -1,2 +1,0 @@
-"/usr/bin/gcc-ar-11" cr libwasmedgeSystem.a CMakeFiles/wasmedgeSystem.dir/allocator.cpp.o CMakeFiles/wasmedgeSystem.dir/fault.cpp.o CMakeFiles/wasmedgeSystem.dir/mmap.cpp.o CMakeFiles/wasmedgeSystem.dir/path.cpp.o
-"/usr/bin/gcc-ranlib-11" libwasmedgeSystem.a

@@ -1,2 +1,0 @@
-"/usr/bin/gcc-ar-11" cr libwasmedgeDriver.a CMakeFiles/wasmedgeDriver.dir/compilerTool.cpp.o CMakeFiles/wasmedgeDriver.dir/runtimeTool.cpp.o CMakeFiles/wasmedgeDriver.dir/fuzzTool.cpp.o CMakeFiles/wasmedgeDriver.dir/fuzzPO.cpp.o CMakeFiles/wasmedgeDriver.dir/uniTool.cpp.o
-"/usr/bin/gcc-ranlib-11" libwasmedgeDriver.a

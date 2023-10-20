@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG -flto -fno-fat-lto-objects -Wl,--export-dynamic -rdynamic CMakeFiles/wasmedge.dir/wasmedge.cpp.o -o wasmedge  -Wl,-rpath,"\$ORIGIN/../../lib/api:" ../../lib/api/libwasmedge.so.0.0.3 /usr/lib/x86_64-linux-gnu/libspdlog.so.1.9.2 /usr/lib/x86_64-linux-gnu/libfmt.so.8.1.1 -Wl,--as-needed 

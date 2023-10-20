@@ -1,2 +1,0 @@
-"/usr/bin/gcc-ar-11" cr libwasmedgeCommon.a CMakeFiles/wasmedgeCommon.dir/hexstr.cpp.o CMakeFiles/wasmedgeCommon.dir/log.cpp.o CMakeFiles/wasmedgeCommon.dir/errinfo.cpp.o CMakeFiles/wasmedgeCommon.dir/int128.cpp.o
-"/usr/bin/gcc-ranlib-11" libwasmedgeCommon.a

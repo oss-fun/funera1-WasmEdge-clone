@@ -1,2 +1,0 @@
-"/usr/bin/gcc-ar-11" cr libwasmedgeHostModuleWasi.a CMakeFiles/wasmedgeHostModuleWasi.dir/environ.cpp.o CMakeFiles/wasmedgeHostModuleWasi.dir/vinode.cpp.o CMakeFiles/wasmedgeHostModuleWasi.dir/wasifunc.cpp.o CMakeFiles/wasmedgeHostModuleWasi.dir/wasimodule.cpp.o "CMakeFiles/wasmedgeHostModuleWasi.dir/clock-linux.cpp.o" "CMakeFiles/wasmedgeHostModuleWasi.dir/environ-linux.cpp.o" "CMakeFiles/wasmedgeHostModuleWasi.dir/inode-linux.cpp.o"
-"/usr/bin/gcc-ranlib-11" libwasmedgeHostModuleWasi.a
