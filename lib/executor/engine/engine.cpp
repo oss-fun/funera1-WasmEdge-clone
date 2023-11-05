@@ -1909,27 +1909,28 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     }
 
     if (DumpFlag) {
-      // For WAMR
-      Migr.dumpMemory(StackMgr.getModule());
-      std::cout << "Success dumpMemory for WAMR" << std::endl;
-      Migr.dumpGlobal(StackMgr.getModule());
-      std::cout << "Success dumpGlobal for WAMR" << std::endl;
-      Migr.dumpStack(StackMgr);
-      std::cout << "Success dumpStack for WAMR" << std::endl;
+      if (Conf.getStatisticsConfigure().getDumpFlag()) {
+        // For WAMR
+        Migr.dumpMemory(StackMgr.getModule());
+        std::cout << "Success dumpMemory for WAMR" << std::endl;
+        Migr.dumpGlobal(StackMgr.getModule());
+        std::cout << "Success dumpGlobal for WAMR" << std::endl;
+        Migr.dumpStack(StackMgr);
+        std::cout << "Success dumpStack for WAMR" << std::endl;
 
-      StackMgr.pushFrame(StackMgr.getModule(), PC, 0, 0, false);
-      Migr.dumpFrame(StackMgr);
-      std::cout << "Success dumpFrame for WAMR" << std::endl;
-      StackMgr.popFrame();
+        StackMgr.pushFrame(StackMgr.getModule(), PC, 0, 0, false);
+        Migr.dumpFrame(StackMgr);
+        std::cout << "Success dumpFrame for WAMR" << std::endl;
+        StackMgr.popFrame();
 
-      // For WasmEdge
-      Migr.dumpIter(PC);
-      std::cout << "Success dumpIter" << std::endl;
-      Migr.dumpStackMgrFrame(StackMgr);
-      std::cout << "Success dumpStackMgrFrame" << std::endl;
-      Migr.dumpStackMgrValue(StackMgr);
-      std::cout << "Success dumpStackMgrValue" << std::endl;
-      // TODO: 途中で止まったことがわかるエラーを返す
+        // For WasmEdge
+        Migr.dumpIter(PC);
+        std::cout << "Success dumpIter" << std::endl;
+        Migr.dumpStackMgrFrame(StackMgr);
+        std::cout << "Success dumpStackMgrFrame" << std::endl;
+        Migr.dumpStackMgrValue(StackMgr);
+        std::cout << "Success dumpStackMgrValue" << std::endl;
+      }
       return {};
     }
 

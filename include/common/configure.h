@@ -176,6 +176,14 @@ public:
     return CostLimit.load(std::memory_order_relaxed);
   }
   
+  void setDumpFlag(bool flag) noexcept {
+    DumpFlag.store(flag, std::memory_order_relaxed);
+  }
+  
+  bool getDumpFlag() const noexcept {
+    return DumpFlag.load(std::memory_order_relaxed);
+  }
+
   void setRestoreFlag(bool flag) noexcept {
     RestoreFlag.store(flag, std::memory_order_relaxed);
   }
@@ -183,7 +191,7 @@ public:
   bool getRestoreFlag() const noexcept {
     return RestoreFlag.load(std::memory_order_relaxed);
   }
-  
+
   void setDebugMode(bool flag) noexcept {
     DebugMode.store(flag, std::memory_order_relaxed);
   }
@@ -196,6 +204,7 @@ private:
   std::atomic<bool> InstrCounting = false;
   std::atomic<bool> CostMeasuring = false;
   std::atomic<bool> TimeMeasuring = false;
+  std::atomic<bool> DumpFlag      = false;
   std::atomic<bool> RestoreFlag   = false;
   std::atomic<bool> DebugMode     = false;
   std::atomic<uint64_t> CostLimit = UINT64_C(-1);
