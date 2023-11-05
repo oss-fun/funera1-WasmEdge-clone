@@ -43,7 +43,7 @@ public:
   /// unexpect operations will occur.
   StackManager() noexcept {
     ValueStack.reserve(2048U);
-    TypeStack.reserve(2048U);
+    // TypeStack.reserve(2048U);
     FrameStack.reserve(16U);
   }
   ~StackManager() = default;
@@ -100,9 +100,6 @@ public:
       ValueStack.erase(ValueStack.begin() + FrameStack.back().VPos -
                            FrameStack.back().Locals,
                        ValueStack.end() - LocalNum);
-      TypeStack.erase(TypeStack.begin() + FrameStack.back().VPos -
-                           FrameStack.back().Locals,
-                       TypeStack.end() - LocalNum);
 
       FrameStack.back().Module = Module;
       FrameStack.back().Locals = LocalNum;

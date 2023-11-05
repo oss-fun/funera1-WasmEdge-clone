@@ -12,7 +12,6 @@ Executor::runMemorySizeOp(Runtime::StackManager &StackMgr,
   // Push SZ = page size to stack.
   // StackMgr.push<uint32_t>(MemInst.getPageSize());
   StackMgr.push(MemInst.getPageSize());
-  StackMgr.getTypeTop() = 0;
   return {};
 }
 

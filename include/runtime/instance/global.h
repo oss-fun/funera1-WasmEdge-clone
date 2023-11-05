@@ -49,16 +49,7 @@ public:
     valueStream.open(valueFile, std::ios::trunc);
 
     // TODO: uint32_t型以外の場合どうなるのか(int32_tとかは同じ値が出力された)
-    ValType T = GlobType.getValType();
-    if (T == ValType::I32 || T == ValType::F32) {
-      valueStream << std::setw(32) << std::setfill('0') << Value.get<uint32_t>() << std::endl;
-    }
-    else if (T == ValType::I64 || T == ValType::F64) {
-      valueStream << std::setw(64) << std::setfill('0') << Value.get<uint64_t>() << std::endl;
-    }
-    else {
-      valueStream << std::setw(128) << std::setfill('0') << Value.get<uint128_t>() << std::endl;
-    }
+    valueStream << Value.get<uint128_t>() << std::endl;
 
     // Close file
     valueStream.close();
