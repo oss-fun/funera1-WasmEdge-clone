@@ -142,6 +142,7 @@ public:
       : InstrCounting(RHS.InstrCounting.load(std::memory_order_relaxed)),
         CostMeasuring(RHS.CostMeasuring.load(std::memory_order_relaxed)),
         TimeMeasuring(RHS.TimeMeasuring.load(std::memory_order_relaxed)),
+        DumpFlag(RHS.DumpFlag.load(std::memory_order_relaxed)),
         RestoreFlag(RHS.RestoreFlag.load(std::memory_order_relaxed)) {}
 
   void setInstructionCounting(bool IsCount) noexcept {
