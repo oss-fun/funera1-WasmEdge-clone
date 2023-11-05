@@ -77,25 +77,12 @@ public:
   /// Push a new value entry to stack.
   template <typename T> void push(T &&Val) {
     ValueStack.push_back(std::forward<T>(Val));
-    // 32bitなら0, 64bitなら1
-    size_t t = sizeof(T);
-    if (t == 4) {
-      TypeStack.push_back((uint8_t)0);
-    }
-    else if (t == 8) {
-      TypeStack.push_back((uint8_t)1);
-    }
-    else {
-      TypeStack.push_back((uint8_t)2);
-    }
-    // std::cout << "[DEBUG]push stack: type kind: " << +TypeStack.back() << ", Pos: " << ValueStack.size() << " " << TypeStack.size() << std::endl;
   }
 
   /// Unsafe Pop and return the top entry.
   Value pop() {
     Value V = std::move(ValueStack.back());
     ValueStack.pop_back();
-    TypeStack.pop_back();
     return V;
   }
   
@@ -133,9 +120,6 @@ public:
     ValueStack.erase(ValueStack.begin() + FrameStack.back().VPos -
                          FrameStack.back().Locals,
                      ValueStack.end() - FrameStack.back().Arity);
-    TypeStack.erase(TypeStack.begin() + FrameStack.back().VPos - 
-                        FrameStack.back().Locals,
-                     TypeStack.end() - FrameStack.back().Arity);
     auto From = FrameStack.back().From;
     FrameStack.pop_back();
     return From;
@@ -144,11 +128,8 @@ public:
   /// Unsafe erase stack.
   void stackErase(uint32_t EraseBegin, uint32_t EraseEnd) noexcept {
     assuming(EraseEnd <= EraseBegin && EraseBegin <= ValueStack.size());
-    assuming(EraseEnd <= EraseBegin && EraseBegin <= TypeStack.size());
     ValueStack.erase(ValueStack.end() - EraseBegin,
                      ValueStack.end() - EraseEnd);
-    TypeStack.erase(TypeStack.end() - EraseBegin,
-                     TypeStack.end() - EraseEnd);
   }
 
   /// Unsafe leave top label.

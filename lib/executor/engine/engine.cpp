@@ -43,7 +43,6 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
 
   // Push arguments.
   for (auto &Val : Params) {
-    std::cout << "[DEBUG]runFunction Params: " << Val.get<uint128_t>() << std::endl;
     StackMgr.push(Val);
   }
 
@@ -204,31 +203,24 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     case OpCode::Select_t: {
       // Pop the i32 value and select values from stack.
       ValVariant CondVal = StackMgr.pop();
-      const uint8_t &T2 = StackMgr.getTypeTop();
       ValVariant Val2 = StackMgr.pop();
-      const uint8_t &T1 = StackMgr.getTypeTop();
       ValVariant Val1 = StackMgr.pop();
 
       // Select the value.
       if (CondVal.get<uint32_t>() == 0) {
         StackMgr.push(Val2);
-        StackMgr.getTypeTop() = T2;
       } else {
         StackMgr.push(Val1);
-        StackMgr.getTypeTop() = T1;
       }
       return {};
     }
 
     // Variable Instructions
     case OpCode::Local__get:
-      // std::cout << "[DEBUG]local.get " << Instr.getTargetIndex() << std::endl;
       return runLocalGetOp(StackMgr, Instr.getStackOffset());
     case OpCode::Local__set:
-      // std::cout << "[DEBUG]local.get " << Instr.getTargetIndex() << std::endl;
       return runLocalSetOp(StackMgr, Instr.getStackOffset());
     case OpCode::Local__tee:
-      // std::cout << "[DEBUG]local.get " << Instr.getTargetIndex() << std::endl;
       return runLocalTeeOp(StackMgr, Instr.getStackOffset());
     case OpCode::Global__get:
       return runGlobalGetOp(StackMgr, Instr.getTargetIndex());
@@ -355,11 +347,9 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     // Const numeric instructions
     case OpCode::I32__const:
     case OpCode::F32__const:
-      StackMgr.push<uint32_t>(Instr.getNum().get<uint32_t>());
-      return {};
     case OpCode::I64__const:
     case OpCode::F64__const:
-      StackMgr.push<uint64_t>(Instr.getNum().get<uint64_t>());
+      StackMgr.push(Instr.getNum());
       return {};
 
     // Unary numeric instructions
@@ -1863,16 +1853,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
   // signal handler
   signal(SIGINT, &signalHandler);
 
-  // int cnt = 0;
-  // int dispatch_count = 0;
-  // int dispatch_limit = -1;
-
   while (PC != PCEnd) {
-    // dispatch_count++;
-    // if (dispatch_count == dispatch_limit)
-    //   DumpFlag = true;
-      
-
     if (Stat) {
       OpCode Code = PC->getOpCode();
       if (Conf.getStatisticsConfigure().isInstructionCounting()) {
@@ -1887,24 +1868,6 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
           return Unexpect(ErrCode::Value::CostLimitExceeded);
         }
       }
-      
-      // if (isInteractiveMode && Conf.getStatisticsConfigure().getDebugMode()) {
-      //   // DebugMode
-      //   // PCのsource locationとbreakで与えられたsource locationが一致するか判定し、一致する場合、isInteractiveMode = trueにする
-      //   // source locationはとりあえず(func_idx, offset)とする
-      //   SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
-      //   std::cout << "PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;
-      //   if (PCSourceLoc == breakpoint) {
-      //     isInteractiveMode = true;
-      //   }
-        
-      //   if (isInteractiveMode) {
-      //     OpCode Code = PC->getOpCode();
-      //     std::cout << "Code is " << std::hex << static_cast<int>(Code) << std::noshowbase << std::endl;
-      //     InteractiveMode(breakpoint, PCSourceLoc, StackMgr);
-      //     isInteractiveMode = false;
-      //   }
-      // }
     }
 
     if (DumpFlag) {
@@ -1933,18 +1896,11 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
       return {};
     }
 
-     
-    // OpCode Code = PC->getOpCode();
-    // std::cout << "[DEBUG]OpCode: 0x" << std::hex << (uint16_t)Code << std::dec << std::endl;
     if (auto Res = Dispatch(); !Res) {
-      SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
-      std::cout << "[WASMEDGE ERROR] PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;
-      InteractiveMode(breakpoint, PCSourceLoc, StackMgr);
       return Unexpect(Res);
     }
     
     PC++;
-    // cnt++;
   }
   return {};
 }

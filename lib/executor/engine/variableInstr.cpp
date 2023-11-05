@@ -11,7 +11,6 @@ namespace Executor {
 Expect<void> Executor::runLocalGetOp(Runtime::StackManager &StackMgr,
                                      uint32_t StackOffset) const noexcept {
   StackMgr.push(StackMgr.getTopN(StackOffset));
-  StackMgr.getTypeTop() = StackMgr.getTypeTopN(StackOffset+1);
 
   // std::cout << "[DEBUG]push stack: type kind: " << +StackMgr.getTypeTop() << ", Pos: " << StackMgr.getValueStack().size() << " " << StackMgr.getTypeStack().size() << std::endl;
   return {};
@@ -34,20 +33,7 @@ Expect<void> Executor::runGlobalGetOp(Runtime::StackManager &StackMgr,
                                       uint32_t Idx) const noexcept {
   auto *GlobInst = getGlobInstByIdx(StackMgr, Idx);
   assuming(GlobInst);
-  ValType T = GlobInst->getGlobalType().getValType();
-  if (T == ValType::I32 || T == ValType::F32) {
-    StackMgr.push(GlobInst->getValue());
-    StackMgr.getTypeTop() = 0;
-  }
-  else if (T == ValType::I64 || T == ValType::F64) {
-    StackMgr.push(GlobInst->getValue());
-    StackMgr.getTypeTop() = 1;
-  }
-  else {
-    StackMgr.push(GlobInst->getValue());
-    StackMgr.getTypeTop() = 2;
-  }
-  // std::cout << "[DEBUG]push stack: type kind: " << +StackMgr.getTypeTop() << ", Pos: " << StackMgr.getValueStack().size() << " " << StackMgr.getTypeStack().size() << std::endl;
+  StackMgr.push(GlobInst->getValue());
   return {};
 }
 
