@@ -14,7 +14,6 @@ Expect<void> Executor::runTableGetOp(Runtime::StackManager &StackMgr,
 
   // Get table[Idx] and push to Stack.
   if (auto Res = TabInst.getRefAddr(Idx)) {
-    std::cout << "[DEBUG]enter runTableGetOp" << std::endl;
     StackMgr.push(Res->get<UnknownRef>());
   } else {
     spdlog::error(ErrInfo::InfoInstruction(Instr.getOpCode(), Instr.getOffset(),

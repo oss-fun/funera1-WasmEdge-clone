@@ -155,7 +155,6 @@ Executor::enterFunction(Runtime::StackManager &StackMgr,
 
     // Push returns back to stack.
     for (uint32_t I = 0; I < Rets.size(); ++I) {
-      std::cout << "[DEBUG]enterFunction::isCompiledFunction" << std::endl;
       StackMgr.push(Rets[I]);
     }
 

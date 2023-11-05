@@ -69,12 +69,6 @@ public:
     return TypeStack.back();
   }
   
-  // void syncTypeTopN(uint32_t Offset) noexcept {
-  //   assuming(0 < Offset && Offset <= TypeStack.size());
-  //   TypeStack.back() = TypeStack[TypeStack.size() - Offset];
-  //   std::cout << "[DEBUG]push stack: type kind: " << +TypeStack.back() << std::endl;
-  // }
-
   /// Unsafe Getter of top N value entries of stack.
   Span<Value> getTopSpan(uint32_t N) {
     return Span<Value>(ValueStack.end() - N, N);
@@ -84,10 +78,11 @@ public:
   template <typename T> void push(T &&Val) {
     ValueStack.push_back(std::forward<T>(Val));
     // 32bitなら0, 64bitなら1
-    if (sizeof(T) == 4) {
+    size_t t = sizeof(T);
+    if (t == 4) {
       TypeStack.push_back((uint8_t)0);
     }
-    else if (sizeof(T) == 8) {
+    else if (t == 8) {
       TypeStack.push_back((uint8_t)1);
     }
     else {
