@@ -63,26 +63,26 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
   }
 
   if (Res) {
-    Migr.preDumpIter(Func.getModule());
+    if (Conf.getStatisticsConfigure().getDumpFlag() || Conf.getStatisticsConfigure().getRestoreFlag()) {
+      Migr.preDumpIter(Func.getModule());
+    }
 
     // Restore
     if (RestoreFlag && Conf.getStatisticsConfigure().getRestoreFlag()) {
-      std::cout << "### Restore! ###" << std::endl;
+      // std::cout << "### Restore! ###" << std::endl;
       auto Res = Migr.restoreIter(Func.getModule());
       if (!Res) {
         return Unexpect(Res);
       }
-      StartIt = Res.value();
-      std::cout << "Success to restore iter" << std::endl;
 
+      StartIt = Res.value();
       StackMgr = Migr.restoreStackMgr().value();
-      std::cout << "Success to restore stack" << std::endl;
       
       /// restoreしたものが元のものと一致するかtest
-      Migr.dumpIter(StartIt, "restored_");
-      Migr.dumpStackMgrFrame(StackMgr, "restored_");
-      Migr.dumpStackMgrValue(StackMgr, "restored_");
-      std::cout << "Success to dump restore file" << std::endl;
+      // Migr.dumpIter(StartIt, "restored_");
+      // Migr.dumpStackMgrFrame(StackMgr, "restored_");
+      // Migr.dumpStackMgrValue(StackMgr, "restored_");
+      // std::cout << "Success to dump restore file" << std::endl;
 
       RestoreFlag = false;
     }
@@ -208,8 +208,6 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
       ValVariant Val2 = StackMgr.pop();
       const uint8_t &T1 = StackMgr.getTypeTop();
       ValVariant Val1 = StackMgr.pop();
-      
-      // std::cout << "[DEBUG] Enter Select, SelectT" << std::endl;
 
       // Select the value.
       if (CondVal.get<uint32_t>() == 0) {
@@ -1865,14 +1863,15 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
   // signal handler
   signal(SIGINT, &signalHandler);
 
-  int cnt = 0;
-  int dispatch_count = 0;
-  int dispatch_limit = -1;
+  // int cnt = 0;
+  // int dispatch_count = 0;
+  // int dispatch_limit = -1;
 
   while (PC != PCEnd) {
-    dispatch_count++;
-    if (dispatch_count == dispatch_limit)
-      DumpFlag = true;
+    // dispatch_count++;
+    // if (dispatch_count == dispatch_limit)
+    //   DumpFlag = true;
+      
 
     if (Stat) {
       OpCode Code = PC->getOpCode();
@@ -1889,23 +1888,23 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
         }
       }
       
-      if (isInteractiveMode && Conf.getStatisticsConfigure().getDebugMode()) {
-        // DebugMode
-        // PCのsource locationとbreakで与えられたsource locationが一致するか判定し、一致する場合、isInteractiveMode = trueにする
-        // source locationはとりあえず(func_idx, offset)とする
-        SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
-        std::cout << "PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;
-        if (PCSourceLoc == breakpoint) {
-          isInteractiveMode = true;
-        }
+      // if (isInteractiveMode && Conf.getStatisticsConfigure().getDebugMode()) {
+      //   // DebugMode
+      //   // PCのsource locationとbreakで与えられたsource locationが一致するか判定し、一致する場合、isInteractiveMode = trueにする
+      //   // source locationはとりあえず(func_idx, offset)とする
+      //   SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
+      //   std::cout << "PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;
+      //   if (PCSourceLoc == breakpoint) {
+      //     isInteractiveMode = true;
+      //   }
         
-        if (isInteractiveMode) {
-          OpCode Code = PC->getOpCode();
-          std::cout << "Code is " << std::hex << static_cast<int>(Code) << std::noshowbase << std::endl;
-          InteractiveMode(breakpoint, PCSourceLoc, StackMgr);
-          isInteractiveMode = false;
-        }
-      }
+      //   if (isInteractiveMode) {
+      //     OpCode Code = PC->getOpCode();
+      //     std::cout << "Code is " << std::hex << static_cast<int>(Code) << std::noshowbase << std::endl;
+      //     InteractiveMode(breakpoint, PCSourceLoc, StackMgr);
+      //     isInteractiveMode = false;
+      //   }
+      // }
     }
 
     if (DumpFlag) {
@@ -1945,7 +1944,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     }
     
     PC++;
-    cnt++;
+    // cnt++;
   }
   return {};
 }
