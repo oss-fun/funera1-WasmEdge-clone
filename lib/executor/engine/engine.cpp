@@ -68,7 +68,7 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
     start = clock();
     Migr.preDumpIter(Func.getModule());
     end = clock();
-    std::cout << "preDumpIter: " << static_cast<double>(end - start) / CLOCKS_PER_SEC * 1000.0 << "[ms]" << "\n";
+    std::cerr << "preDumpIter: " << static_cast<double>(end - start) / CLOCKS_PER_SEC * 1000.0 << "[ms]" << "\n";
 
     // Restore
     if (RestoreFlag && Conf.getStatisticsConfigure().getRestoreFlag()) {
@@ -80,20 +80,17 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
         return Unexpect(Res);
       }
       StartIt = Res.value();
-      // std::cout << "Success to restore iter" << std::endl;
-
       StackMgr = Migr.restoreStackMgr().value();
-      // std::cout << "Success to restore stack" << std::endl;
-      
+
+      RestoreFlag = false;
       /// restoreしたものが元のものと一致するかtest
       // Migr.dumpIter(StartIt, "restored_");
       // Migr.dumpStackMgrFrame(StackMgr, "restored_");
       // Migr.dumpStackMgrValue(StackMgr, "restored_");
       // std::cout << "Success to dump restore file" << std::endl;
 
-      RestoreFlag = false;
       end = clock();
-      std::cout << "Restore: " << static_cast<double>(end - start) / CLOCKS_PER_SEC * 1000.0 << "[ms]" << "\n";
+      std::cerr << "Restore: " << static_cast<double>(end - start) / CLOCKS_PER_SEC * 1000.0 << "[ms]" << "\n";
     }
   
     // If not terminated, execute the instructions in interpreter mode.
@@ -1931,18 +1928,13 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
         Migr.dumpFrame(StackMgr);
         StackMgr.popFrame();
 
-        end = clock();
-        std::cout << "Dump WAMR snapshot: " << static_cast<double>(end - start) / CLOCKS_PER_SEC * 1000.0 << "[ms]" << "\n";
-
         // For WasmEdge
-        start = clock();
-
         Migr.dumpIter(PC);
         Migr.dumpStackMgrFrame(StackMgr);
         Migr.dumpStackMgrValue(StackMgr);
 
         end = clock();
-        std::cout << "Dump WasmEdge snapshot: " << static_cast<double>(end - start) / CLOCKS_PER_SEC * 1000.0 << "[ms]" << "\n";
+        std::cerr << "snapshot: " << static_cast<double>(end - start) / CLOCKS_PER_SEC * 1000.0 << "[ms]" << "\n";
       }
       return {};
     }
