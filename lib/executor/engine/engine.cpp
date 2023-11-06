@@ -90,7 +90,7 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
       // std::cout << "Success to dump restore file" << std::endl;
 
       end = clock();
-      std::cerr << "Restore: " << static_cast<double>(end - start) / CLOCKS_PER_SEC * 1000.0 << "[ms]" << "\n";
+      std::cerr << "restore: " << static_cast<double>(end - start) / CLOCKS_PER_SEC * 1000.0 << "[ms]" << "\n";
     }
   
     // If not terminated, execute the instructions in interpreter mode.
