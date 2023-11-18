@@ -166,9 +166,9 @@ public:
     }
 
     // PRINT DEBUG
-    // std::cout << "[DEBUG]TypeStack: [";
-    // for (size_t I = 0; I < Vals.size(); ++I) std::cout << +Typs[I];
-    // std::cout << "]" << std::endl;
+    std::cout << "[DEBUG]TypeStack: [";
+    for (size_t I = 0; I < Vals.size(); ++I) std::cout << +Typs[I];
+    std::cout << "]" << std::endl;
 
     for (size_t I = 0; I < Vals.size(); ++I) {
       Value v = Vals[I];
@@ -681,19 +681,19 @@ public:
     //   // return Unexpect(Res);
     // }
     std::vector<Runtime::StackManager::Frame> fs = restoreStackMgrFrame().value();
-    // std::cout << "Success to restore stack frame" << std::endl;
+    std::cout << "Success to restore stack frame" << std::endl;
 
     // Res = restoreStackMgrValue();
     // if (!Res) {
     //   return Unexpect(Res);
     // }
     std::vector<Runtime::StackManager::Value> vs = restoreStackMgrValue().value();
-    // std::cout << "Success to restore stack value" << std::endl;
+    std::cout << "Success to restore stack value" << std::endl;
 
     Runtime::StackManager StackMgr;
     StackMgr.setFrameStack(fs);
     StackMgr.setValueStack(vs);
-    // std::cout << "Success to restore stack manager" << std::endl;
+    std::cout << "Success to restore stack manager" << std::endl;
 
     return StackMgr;
   }
