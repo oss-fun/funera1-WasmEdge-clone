@@ -353,10 +353,17 @@ public:
     }
 
     // PageLimitをfileにdump
-    uint32_t memLimit = MemType.getLimit().getMin();
-    ofs << memLimit << std::endl;
+    uint32_t CurPageCount = MemType.getLimit().getMin();
+    ofs << CurPageCount << std::endl;
     ofs.close();
+    
 
+    // wamr
+    std::ofstream page_count_fout;
+    page_count_fout.open("mem_page_count.img", std::ios::trunc | std::ios::binary);
+    page_count_fout.write(reinterpret_cast<char *>(&CurPageCount), sizeof(CurPageCount));
+
+    page_count_fout.close();
     return {};
   }
   
