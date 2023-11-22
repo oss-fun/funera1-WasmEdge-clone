@@ -193,7 +193,7 @@ public:
 
   void restoreMemInst(std::string name) const noexcept {
     // std::unique_lock Lock(Mutex);
-    assert(MemInsts);
+    // assert(MemInsts);
 
     for (uint32_t I = 0; I < getMemoryNum(); ++I) {
       auto Res = getMemory(I);

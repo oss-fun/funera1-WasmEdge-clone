@@ -10,8 +10,9 @@ namespace Executor {
 
 Expect<void> Executor::runLocalGetOp(Runtime::StackManager &StackMgr,
                                      uint32_t StackOffset) const noexcept {
-  StackMgr.push(StackMgr.getTopN(StackOffset));
-  StackMgr.getTypeTop() = StackMgr.getTypeTopN(StackOffset+1);
+  // uint8_t typ = StackMgr.getTypeTopN(StackOffset);
+   StackMgr.push(StackMgr.getTopN(StackOffset), StackMgr.getTypeTopN(StackOffset));
+  // StackMgr.getTypeTop() = StackMgr.getTypeTopN(StackOffset+1);
 
   // std::cout << "[DEBUG]push stack: type kind: " << +StackMgr.getTypeTop() << ", Pos: " << StackMgr.getValueStack().size() << " " << StackMgr.getTypeStack().size() << std::endl;
   return {};

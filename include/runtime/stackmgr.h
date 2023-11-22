@@ -85,15 +85,20 @@ public:
     ValueStack.push_back(std::forward<T>(Val));
     // 32bitなら0, 64bitなら1
     if (sizeof(T) == 4) {
-      TypeStack.push_back((uint8_t)0);
+      TypeStack.push_back(std::forward<uint8_t>(0));
     }
     else if (sizeof(T) == 8) {
-      TypeStack.push_back((uint8_t)1);
+      TypeStack.push_back(std::forward<uint8_t>(1));
     }
     else {
-      TypeStack.push_back((uint8_t)2);
+      TypeStack.push_back(std::forward<uint8_t>(2));
     }
     // std::cout << "[DEBUG]push stack: type kind: " << +TypeStack.back() << ", Pos: " << ValueStack.size() << " " << TypeStack.size() << std::endl;
+  }
+
+  template <typename T, typename U> void push(T &&Val, U &&Typ) {
+    ValueStack.push_back(std::forward<T>(Val));
+    TypeStack.push_back(std::forward<U>(Typ));
   }
 
   /// Unsafe Pop and return the top entry.
