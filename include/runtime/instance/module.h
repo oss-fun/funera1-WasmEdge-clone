@@ -192,12 +192,7 @@ public:
   }
 
   void restoreMemInst(std::string name) const noexcept {
-    std::cout << "Enter restoreMemInst" << std::endl;
-    // std::unique_lock Lock(Mutex);
-    // assert(MemInsts);
-
     for (uint32_t I = 0; I < getMemoryNum(); ++I) {
-      std::cout << "restoreMemInst: " << I << std::endl;
       auto Res = getMemory(I);
       MemoryInstance* MemInst = Res.value();
       MemInst->restore(name + "_meminst_" + std::to_string(I));
