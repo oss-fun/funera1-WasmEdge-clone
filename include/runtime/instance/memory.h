@@ -412,7 +412,9 @@ public:
     if (auto Res = restoreDataPtr(filename)) {
       Span<Byte> Byte = Res.value();
       // TODO: setBytesをする際のgrowPageの兼ね合いとかどうなってるか確認する
-      setBytes(Byte, 0, 0, Byte.size());
+      if (auto Res = setBytes(Byte, 0, 0, Byte.size()); !Res){
+        return Unexpect(Res);
+      }
     }
     else {
       return Unexpect(Res);
@@ -466,15 +468,14 @@ public:
     int length = ifs.tellg();
     ifs.seekg(0, std::ios::beg);
 
-    uint8_t* data = new uint8_t[length];
-    ifs.read(reinterpret_cast<char*>(data), length);
+    uint8_t data[length];
+    ifs.read(reinterpret_cast<char*>(&data), length);
     if (!ifs) {
       // static_assert(ifs, "dataptr.imgから読み込みが成功しなかった");      
     }
     ifs.close();
     Span<Byte> bytes = Span<Byte>(&data[0], length);
-    delete data;
-
+      
     return bytes;
   }
 
