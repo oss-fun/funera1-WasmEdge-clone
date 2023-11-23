@@ -388,11 +388,13 @@ public:
   
   
   Expect<void> restore(std::string filename) noexcept {
+    std::cout << "Enter MemInst.restore()" << std::endl;
     // Restore MemType
     uint32_t oldPageSize = getPageSize();
     uint32_t newPageSize;
 
     if (auto Res = restoreMemType(filename)) {
+      std::cout << "restoreMemType: " << Res.value() << std::endl;
       newPageSize = Res.value();
       // 新しいページサイズが前のページサイズを下回ることはないはず
       // static_assert(newPageSize >= oldPageSize);
@@ -401,6 +403,7 @@ public:
         MemType.getLimit().setMin(newPageSize);
       }
       else {
+        std::cout << "Terminated restore memory" << std::endl;
         return Unexpect(ErrCode::Value::Terminated);
       }
     }
@@ -410,9 +413,15 @@ public:
     
     // Restore DataPtr
     if (auto Res = restoreDataPtr(filename)) {
+      std::cout << "before Restore DataPtr" << std::endl;
       Span<Byte> Byte = Res.value();
+      std::cout << "DataPtr[0]: " << Byte[0] << std::endl;
       // TODO: setBytesをする際のgrowPageの兼ね合いとかどうなってるか確認する
-      setBytes(Byte, 0, 0, Byte.size());
+      auto Res2 = setBytes(Byte, 0, 0, Byte.size());
+      if (!Res2){
+        std::cout << "Error setBytes()" << std::endl;
+      }
+      std::cout << "Restore DataPtr" << std::endl;
     }
     else {
       return Unexpect(Res);
@@ -466,15 +475,14 @@ public:
     int length = ifs.tellg();
     ifs.seekg(0, std::ios::beg);
 
-    uint8_t* data = new uint8_t[length];
-    ifs.read(reinterpret_cast<char*>(data), length);
+    uint8_t data[length];
+    ifs.read(reinterpret_cast<char*>(&data), length);
     if (!ifs) {
       // static_assert(ifs, "dataptr.imgから読み込みが成功しなかった");      
     }
     ifs.close();
     Span<Byte> bytes = Span<Byte>(&data[0], length);
-    delete data;
-
+      
     return bytes;
   }
 

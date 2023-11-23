@@ -594,6 +594,7 @@ public:
   }
   
   Expect<std::vector<Runtime::StackManager::Frame>> restoreStackMgrFrame() {
+    std::cout << "Enter restoreStackMgrFrame" << std::endl;
     std::ifstream FrameStream;
     FrameStream.open("stackmgr_frame.img");
     Runtime::StackManager StackMgr;
@@ -603,6 +604,7 @@ public:
     std::string FrameString;
     /// TODO: ループ条件見直す
     std::map<std::string, const Runtime::Instance::ModuleInstance*> ModCache;
+    std::cout << "restoreStackMgrFrame 1" << std::endl;
     while(getline(FrameStream, FrameString)) {
       // ModuleInstance
       std::string ModName = FrameString;
@@ -630,18 +632,23 @@ public:
       }
       // std::cout << "restore frame: 2" << std::endl;
 
+      std::cout << "restoreStackMgrFrame 2" << std::endl;
+      std::cout << "ModCache.count(ModName) is " << ModCache.count(ModName) << std::endl;
       /// TODO: 同じModuleの復元をしないよう、キャッシュを作る
       if (ModCache.count(ModName) == 0) {
-        // std::cout << ModInst->getMemoryNum() << std::endl;
+        std::cout << "before restore memory" << std::endl;
         ModInst->restoreMemInst(std::string(ModName));
+        std::cout << "restore memory" << std::endl;
         // std::cout << "Success restore meminst" << std::endl;
         ModInst->restoreGlobInst(std::string(ModName));
+        std::cout << "restore global" << std::endl;
         // std::cout << "Success restore globinst" << std::endl;
         ModCache[ModName] = ModInst;
       }
       else {
         ModInst = ModCache[ModName];
       }
+      std::cout << "restoreStackMgrFrame 3" << std::endl;
       // std::cout << "restore frame: 3" << std::endl;
 
       // Iterator
@@ -654,6 +661,7 @@ public:
         return Unexpect(Res);
       }
       AST::InstrView::iterator From = Res.value();
+      std::cout << "restoreStackMgrFrame 4" << std::endl;
       // AST::InstrView::iterator From = _restoreIter(ModInst, FuncIdx, Offset).value();
       // std::cout << "restore frame: 4" << std::endl;
 
@@ -664,7 +672,7 @@ public:
       uint32_t VPos = static_cast<uint32_t>(std::stoul(FrameString));
       getline(FrameStream, FrameString);
       uint32_t Arity = static_cast<uint32_t>(std::stoul(FrameString));
-      // std::cout << "restore frame: 5" << std::endl;
+      std::cout << "restoreStackMgrFrame 5" << std::endl;
 
       Runtime::StackManager::Frame f(ModInst, From, Locals, Arity, VPos);
       FrameStack.push_back(f);
@@ -672,6 +680,7 @@ public:
       // 空の行を読み捨て
       getline(FrameStream, FrameString);
     }
+    std::cout << "Finish restoreStackMgrFrame" << std::endl;
 
     FrameStream.close();
     return FrameStack;
