@@ -388,13 +388,11 @@ public:
   
   
   Expect<void> restore(std::string filename) noexcept {
-    std::cout << "Enter MemInst.restore()" << std::endl;
     // Restore MemType
     uint32_t oldPageSize = getPageSize();
     uint32_t newPageSize;
 
     if (auto Res = restoreMemType(filename)) {
-      std::cout << "restoreMemType: " << Res.value() << std::endl;
       newPageSize = Res.value();
       // 新しいページサイズが前のページサイズを下回ることはないはず
       // static_assert(newPageSize >= oldPageSize);
@@ -403,7 +401,6 @@ public:
         MemType.getLimit().setMin(newPageSize);
       }
       else {
-        std::cout << "Terminated restore memory" << std::endl;
         return Unexpect(ErrCode::Value::Terminated);
       }
     }
@@ -413,15 +410,11 @@ public:
     
     // Restore DataPtr
     if (auto Res = restoreDataPtr(filename)) {
-      std::cout << "before Restore DataPtr" << std::endl;
       Span<Byte> Byte = Res.value();
-      std::cout << "DataPtr[0]: " << Byte[0] << std::endl;
       // TODO: setBytesをする際のgrowPageの兼ね合いとかどうなってるか確認する
-      auto Res2 = setBytes(Byte, 0, 0, Byte.size());
-      if (!Res2){
-        std::cout << "Error setBytes()" << std::endl;
+      if (auto Res = setBytes(Byte, 0, 0, Byte.size()); !Res){
+        return Unexpect(Res);
       }
-      std::cout << "Restore DataPtr" << std::endl;
     }
     else {
       return Unexpect(Res);
