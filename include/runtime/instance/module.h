@@ -187,7 +187,10 @@ public:
     for (uint32_t I = 0; I < getMemoryNum(); ++I) {
         auto Res = getMemory(I);
         MemoryInstance* MemInst = Res.value();
-        MemInst->dump(name + "_meminst_" + std::to_string(I));
+        if (I == 0)
+          MemInst->dump(name);
+        else
+          MemInst->dump(name + std::to_string(I));
     }
   }
 
@@ -195,7 +198,10 @@ public:
     for (uint32_t I = 0; I < getMemoryNum(); ++I) {
       auto Res = getMemory(I);
       MemoryInstance* MemInst = Res.value();
-      MemInst->restore(name + "_meminst_" + std::to_string(I));
+      if (I == 0)
+        MemInst->restore(name);
+      else
+        MemInst->restore(name + std::to_string(I));
     }
   }
   
