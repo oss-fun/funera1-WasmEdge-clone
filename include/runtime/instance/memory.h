@@ -409,7 +409,6 @@ public:
     
     // Restore DataPtr
     uint32_t ByteSize = MemType.getLimit().getMin() * kPageSize;
-    // std::unique_ptr<uint8_t[]> data(new uint8_t(ByteSize));
     if (auto Res = restoreDataPtr(filename)) {
       std::unique_ptr<uint8_t[]> data = std::move(Res.value());
       // TODO: setBytesをする際のgrowPageの兼ね合いとかどうなってるか確認する
