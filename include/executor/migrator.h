@@ -632,8 +632,20 @@ public:
 
       /// TODO: 同じModuleの復元をしないよう、キャッシュを作る
       if (ModCache.count(ModName) == 0) {
+        time_t start, end;
+
+        // restore memory
+        start = clock();
         ModInst->restoreMemInst(std::string(ModName));
+        end = clock();
+        std::cout << ",memory, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        
+        // restore global
+        start = clock(); 
         ModInst->restoreGlobInst(std::string(ModName));
+        end = clock();
+        std::cout << ",global, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        
         ModCache[ModName] = ModInst;
       }
       else {
@@ -694,16 +706,20 @@ public:
   }
 
   Expect<Runtime::StackManager> restoreStackMgr() {
-    std::vector<Runtime::StackManager::Frame> fs = restoreStackMgrFrame().value();
-    std::cout << "Success to restore stack frame" << std::endl;
-
-    std::vector<Runtime::StackManager::Value> vs = restoreStackMgrValue().value();
-    std::cout << "Success to restore stack value" << std::endl;
-
+    time_t start, end;
     Runtime::StackManager StackMgr;
+
+    start = clock();
+    std::vector<Runtime::StackManager::Frame> fs = restoreStackMgrFrame().value();
     StackMgr.setFrameStack(fs);
+    end = clock();
+    std::cout << "frame stack, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+
+    start = clock();
+    std::vector<Runtime::StackManager::Value> vs = restoreStackMgrValue().value();
     StackMgr.setValueStack(vs);
-    std::cout << "Success to restore stack manager" << std::endl;
+    end = clock();
+    std::cout << "value stack, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
 
     return StackMgr;
   }
