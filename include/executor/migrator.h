@@ -141,10 +141,6 @@ public:
   /// ================
   /// Dump functions for WAMR
   /// ================
-  // void dumpMemory(const Runtime::Instance::ModuleInstance* ModInst) {
-  //   ModInst->dumpMemInst("wamr");
-  // }
-  
   void dumpGlobal(const Runtime::Instance::ModuleInstance* ModInst) {
     ModInst->dumpGlobInst("wamr");
   }

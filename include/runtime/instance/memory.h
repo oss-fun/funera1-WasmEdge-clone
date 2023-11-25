@@ -346,25 +346,15 @@ public:
   
   Expect<void> dumpMemType(std::string filename) {
     // Open file
-    // filename = filename + "_memtype.img";
-    // filename = "mem_page_count.img";
-    // std::ofstream ofs(filename, std::ios::trunc);
-    // if (!ofs) {
-    //   return Unexpect(ErrCode::Value::IllegalPath);
-    // }
-
-    // ofs << CurPageCount << std::endl;
-    // ofs.close();
-
-    // PageLimitをfileにdump
-    uint32_t CurPageCount = MemType.getLimit().getMin();
     filename = "mem_page_count.img";
-    // wamr
-    std::ofstream page_count_fout;
-    page_count_fout.open(filename, std::ios::trunc | std::ios::binary);
-    page_count_fout.write(reinterpret_cast<char *>(&CurPageCount), sizeof(CurPageCount));
+    // filename = filename + "_memtype.img";
+    uint32_t CurPageCount = MemType.getLimit().getMin();
 
-    page_count_fout.close();
+    std::ofstream fout;
+    fout.open(filename, std::ios::trunc | std::ios::binary);
+    fout.write(reinterpret_cast<char *>(&CurPageCount), sizeof(CurPageCount));
+
+    fout.close();
     return {};
   }
   
@@ -434,29 +424,10 @@ public:
       return Unexpect(ErrCode::Value::IllegalPath);
     }
     
-    // TODO: バイナリで読み書きした方が良さそう
-    // std::string memTypeStr;
     uint32_t mem_page_count;
-    // getline(ifs, memTypeStr);
     ifs.read(reinterpret_cast<char*>(&mem_page_count), sizeof(uint32_t));
     ifs.close();
 
-    // uint32_t memLimit;
-    // try {
-    //   memLimit = stoi(memTypeStr);
-    // } catch (const std::invalid_argument& e) {
-    //   std::cout << "\x1b[31m";
-    //   std::cout << "Error: MemTypeString[" << memTypeStr << "]: invalid argument" << std::endl;
-    //   std::cout << "\x1b[m";
-
-    //   return Unexpect(ErrCode::Value::InvalidConvToInt);
-    // } catch (const std::out_of_range& e) {
-    //   std::cout << "\x1b[31m";
-    //   std::cout << "Error: MemTypeString[" << memTypeStr << "]: out of range" << std::endl;
-    //   std::cout << "\x1b[m";
-
-    //   return Unexpect(ErrCode::Value::InvalidConvToInt);
-    // }
     return mem_page_count;
   }
   
