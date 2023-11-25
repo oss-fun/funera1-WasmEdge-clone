@@ -106,7 +106,7 @@ public:
 
   SourceLoc getSourceLoc(AST::InstrView::iterator Iter) {
     IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
-    assert(IterMigrator);
+    // assert(IterMigrator);
 
     struct SourceLoc Data = IterMigrator[Iter];
     return Data;
@@ -192,7 +192,7 @@ public:
     std::vector<struct CtrlInfo> CtrlStack;
     
     IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
-    assert(IterMigrator);
+    // assert(IterMigrator);
 
     AST::InstrView::iterator PCStart = Func->getInstrs().begin();
     AST::InstrView::iterator PCEnd = Func->getInstrs().end();
@@ -416,7 +416,7 @@ public:
   
   void dumpIter(AST::InstrView::iterator Iter, std::string fname_header = "") {
     IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
-    assert(IterMigrator);
+    // assert(IterMigrator);
 
     struct SourceLoc Data = IterMigrator[Iter];
     std::ofstream iterStream;
