@@ -413,9 +413,8 @@ public:
     if (auto Res = restoreDataPtr(filename)) {
       std::unique_ptr<uint8_t[]> data = std::move(Res.value());
       // TODO: setBytesをする際のgrowPageの兼ね合いとかどうなってるか確認する
-      // Span<Byte> byte(data.get(), ByteSize);
-      if (auto Res = setArray(data.get(), 0, 0, ByteSize); !Res){
-      // if (auto Res = setBytes(byte, 0, 0, ByteSize); !Res){
+      Span<Byte> byte(data.get(), ByteSize);
+      if (auto Res = setBytes(byte, 0, 0, ByteSize); !Res){
         return Unexpect(Res);
       }
     }
@@ -468,14 +467,12 @@ public:
     int length = ifs.tellg();
     ifs.seekg(0, std::ios::beg);
 
-    // std::unique_ptr<uint8_t[]> ptr = std::make_unique<uint8_t[]>(length);
+    std::unique_ptr<uint8_t[]> ptr = std::make_unique<uint8_t[]>(length);
     ifs.read(reinterpret_cast<char*>(ptr.get()), length);
     if (!ifs) {
       // static_assert(ifs, "dataptr.imgから読み込みが成功しなかった");      
     }
     ifs.close();
-    // Span<Byte> bytes = Span<Byte>(&data[0], length);
-    // delete data;
     return ptr;
   }
 
