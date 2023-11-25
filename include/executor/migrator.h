@@ -141,10 +141,6 @@ public:
   /// ================
   /// Dump functions for WAMR
   /// ================
-  void dumpMemory(const Runtime::Instance::ModuleInstance* ModInst) {
-    ModInst->dumpMemInst("wamr");
-  }
-  
   void dumpGlobal(const Runtime::Instance::ModuleInstance* ModInst) {
     ModInst->dumpGlobInst("wamr");
   }
@@ -690,17 +686,9 @@ public:
   }
 
   Expect<Runtime::StackManager> restoreStackMgr() {
-    // auto Res = restoreStackMgrFrame().value;
-    // if (!Res) {
-    //   // return Unexpect(Res);
-    // }
     std::vector<Runtime::StackManager::Frame> fs = restoreStackMgrFrame().value();
     std::cout << "Success to restore stack frame" << std::endl;
 
-    // Res = restoreStackMgrValue();
-    // if (!Res) {
-    //   return Unexpect(Res);
-    // }
     std::vector<Runtime::StackManager::Value> vs = restoreStackMgrValue().value();
     std::cout << "Success to restore stack value" << std::endl;
 
