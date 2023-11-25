@@ -67,22 +67,22 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
 
     // Restore
     if (RestoreFlag && Conf.getStatisticsConfigure().getRestoreFlag()) {
-      std::cout << "### Restore! ###" << std::endl;
+      // std::cout << "### Restore! ###" << std::endl;
       auto Res = Migr.restoreIter(Func.getModule());
       if (!Res) {
         return Unexpect(Res);
       }
       StartIt = Res.value();
-      std::cout << "Success to restore iter" << std::endl;
+      // std::cout << "Success to restore iter" << std::endl;
 
       StackMgr = Migr.restoreStackMgr().value();
-      std::cout << "Success to restore stack" << std::endl;
+      // std::cout << "Success to restore stack" << std::endl;
       
       /// restoreしたものが元のものと一致するかtest
-      Migr.dumpIter(StartIt, "restored_");
-      Migr.dumpStackMgrFrame(StackMgr, "restored_");
-      Migr.dumpStackMgrValue(StackMgr, "restored_");
-      std::cout << "Success to dump restore file" << std::endl;
+      // Migr.dumpIter(StartIt, "restored_");
+      // Migr.dumpStackMgrFrame(StackMgr, "restored_");
+      // Migr.dumpStackMgrValue(StackMgr, "restored_");
+      // std::cout << "Success to dump restore file" << std::endl;
 
       RestoreFlag = false;
     }
@@ -1910,26 +1910,54 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
 
     if (DumpFlag) {
       if (Conf.getStatisticsConfigure().getDumpFlag()) {
+        time_t astart, aend;
+        time_t start, end;
         // For WAMR
         // Migr.dumpMemory(StackMgr.getModule());
         // std::cout << "Success dumpMemory for WAMR" << std::endl;
+        
+        astart = clock();
+        std::cout << "WAMR" << std::endl;
+        start = clock();
         Migr.dumpGlobal(StackMgr.getModule());
-        std::cout << "Success dumpGlobal for WAMR" << std::endl;
-        Migr.dumpStack(StackMgr);
-        std::cout << "Success dumpStack for WAMR" << std::endl;
+        end = clock();
+        std::cout << "global, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
 
+        
+        // std::cout << "Success dumpGlobal for WAMR" << std::endl;
+        start = clock();
+        Migr.dumpStack(StackMgr);
+        end = clock();
+        std::cout << "value stack, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        // std::cout << "Success dumpStack for WAMR" << std::endl;
+
+        start = clock();
         StackMgr.pushFrame(StackMgr.getModule(), PC, 0, 0, false);
         Migr.dumpFrame(StackMgr);
-        std::cout << "Success dumpFrame for WAMR" << std::endl;
         StackMgr.popFrame();
+        end = clock();
+        std::cout << "frame stack&program counter, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
 
         // For WasmEdge
+        std::cout << "WasmEdge" << std::endl;
+        start = clock();
         Migr.dumpIter(PC);
-        std::cout << "Success dumpIter" << std::endl;
+        end = clock();
+        std::cout << "program counter, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        // std::cout << "Success dumpIter" << std::endl;
+        start = clock();
         Migr.dumpStackMgrFrame(StackMgr);
-        std::cout << "Success dumpStackMgrFrame" << std::endl;
+        end = clock();
+        std::cout << "frame stack, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        // std::cout << "Success dumpStackMgrFrame" << std::endl;
+        start = clock();
         Migr.dumpStackMgrValue(StackMgr);
-        std::cout << "Success dumpStackMgrValue" << std::endl;
+        end = clock();
+        std::cout << "value stack, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        // std::cout << "Success odumpStackMgrValue" << std::endl;
+        // 
+        aend = clock();
+        std::cout << "total, " << static_cast<double>(aend-astart) / CLOCKS_PER_SEC * 1000.0 << std::endl;
       }
       return {};
     }

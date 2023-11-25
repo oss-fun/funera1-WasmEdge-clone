@@ -161,9 +161,9 @@ public:
       exit(1);
     }
 
-    std::cout << "[DEBUG]TypeStack: [";
-    for (size_t I = 0; I < Vals.size(); ++I) std::cout << +Typs[I];
-    std::cout << "]" << std::endl;
+    // std::cout << "[DEBUG]TypeStack: [";
+    // for (size_t I = 0; I < Vals.size(); ++I) std::cout << +Typs[I];
+    // std::cout << "]" << std::endl;
 
     for (size_t I = 0; I < Vals.size(); ++I) {
       Value v = Vals[I];
@@ -474,8 +474,16 @@ public:
 
       // まだそのModInstを保存してなければ、dumpする
       if(!seenModInst[ModName]) {
+        time_t start, end;
+        start = clock();
         ModInst->dumpMemInst(fname_header + std::string(ModName));
+        end = clock();
+        std::cout << ",memory, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+
+        start = clock();
         ModInst->dumpGlobInst(fname_header + std::string(ModName));
+        end = clock();
+        std::cout << ",global, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
         seenModInst[ModName] = true;
       }
       
