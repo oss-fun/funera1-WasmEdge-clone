@@ -410,10 +410,12 @@ public:
     // Restore DataPtr
     uint32_t ByteSize = MemType.getLimit().getMin() * kPageSize;
     if (auto Res = restoreDataPtr(filename)) {
-      std::unique_ptr<uint8_t[]> data = std::move(Res.value());
+      // std::unique_ptr<uint8_t[]> data = std::move(Res.value());
+      std::vector<uint8_t> v = Res.value();
       // TODO: setBytesをする際のgrowPageの兼ね合いとかどうなってるか確認する
-      Span<Byte> byte(data.get(), ByteSize);
-      if (auto Res = setBytes(byte, 0, 0, ByteSize); !Res){
+      // Span<Byte> byte(data.get(), ByteSize);
+      if (auto Res = setBytes(Span<uint8_t>(v), 0, 0, ByteSize); !Res){
+      // if (auto Res = setArray(data.get(), 0, 0, ByteSize); !Res){
         return Unexpect(Res);
       }
     }
@@ -455,7 +457,7 @@ public:
     return memLimit;
   }
   
-  Expect<std::unique_ptr<uint8_t[]>> restoreDataPtr(std::string filename) {
+  Expect<std::vector<uint8_t>> restoreDataPtr(std::string filename) {
     filename = filename + "_dataptr.img";
     std::ifstream ifs(filename, std::ios::binary);
     if (!ifs) {
@@ -466,13 +468,14 @@ public:
     int length = ifs.tellg();
     ifs.seekg(0, std::ios::beg);
 
-    std::unique_ptr<uint8_t[]> ptr = std::make_unique<uint8_t[]>(length);
-    ifs.read(reinterpret_cast<char*>(ptr.get()), length);
+    // std::unique_ptr<uint8_t[]> ptr = std::make_unique<uint8_t[]>(length);
+    std::vector<uint8_t> vec(length);
+    ifs.read(reinterpret_cast<char*>(vec.data()), length);
     if (!ifs) {
       // static_assert(ifs, "dataptr.imgから読み込みが成功しなかった");      
     }
     ifs.close();
-    return ptr;
+    return vec;
   }
 
 private:
