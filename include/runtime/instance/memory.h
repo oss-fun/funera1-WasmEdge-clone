@@ -465,7 +465,6 @@ public:
     int length = ifs.tellg();
     ifs.seekg(0, std::ios::beg);
 
-    // std::unique_ptr<uint8_t[]> ptr = std::make_unique<uint8_t[]>(length);
     std::vector<uint8_t> vec(length);
     ifs.read(reinterpret_cast<char*>(vec.data()), length);
     if (!ifs) {
