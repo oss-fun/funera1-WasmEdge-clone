@@ -356,7 +356,6 @@ public:
     uint32_t CurPageCount = MemType.getLimit().getMin();
     ofs << CurPageCount << std::endl;
     ofs.close();
-    
 
     // wamr
     std::ofstream page_count_fout;
@@ -409,18 +408,20 @@ public:
     }
     
     // Restore DataPtr
+    uint32_t ByteSize = MemType.getLimit().getMin() * kPageSize;
+    // std::unique_ptr<uint8_t[]> data(new uint8_t(ByteSize));
     if (auto Res = restoreDataPtr(filename)) {
-      Span<Byte> Byte = Res.value();
+      std::unique_ptr<uint8_t[]> data = std::move(Res.value());
       // TODO: setBytesをする際のgrowPageの兼ね合いとかどうなってるか確認する
-      if (auto Res = setBytes(Byte, 0, 0, Byte.size()); !Res){
+      // Span<Byte> byte(data.get(), ByteSize);
+      if (auto Res = setArray(data.get(), 0, 0, ByteSize); !Res){
+      // if (auto Res = setBytes(byte, 0, 0, ByteSize); !Res){
         return Unexpect(Res);
       }
     }
     else {
       return Unexpect(Res);
     }
-    
-    
     return {};
   }
   
@@ -456,27 +457,26 @@ public:
     return memLimit;
   }
   
-  Expect<Span<Byte>> restoreDataPtr(std::string filename) {
+  Expect<std::unique_ptr<uint8_t[]>> restoreDataPtr(std::string filename) {
     filename = filename + "_dataptr.img";
     std::ifstream ifs(filename, std::ios::binary);
     if (!ifs) {
       return Unexpect(ErrCode::Value::IllegalPath);
     }
-
     // ファイルのサイズを取得
     ifs.seekg(0, std::ios::end);
     int length = ifs.tellg();
     ifs.seekg(0, std::ios::beg);
 
-    uint8_t data[length];
-    ifs.read(reinterpret_cast<char*>(&data), length);
+    // std::unique_ptr<uint8_t[]> ptr = std::make_unique<uint8_t[]>(length);
+    ifs.read(reinterpret_cast<char*>(ptr.get()), length);
     if (!ifs) {
       // static_assert(ifs, "dataptr.imgから読み込みが成功しなかった");      
     }
     ifs.close();
-    Span<Byte> bytes = Span<Byte>(&data[0], length);
-      
-    return bytes;
+    // Span<Byte> bytes = Span<Byte>(&data[0], length);
+    // delete data;
+    return ptr;
   }
 
 private:
