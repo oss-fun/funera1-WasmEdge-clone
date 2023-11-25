@@ -346,20 +346,22 @@ public:
   
   Expect<void> dumpMemType(std::string filename) {
     // Open file
-    filename = filename + "_memtype.img";
-    std::ofstream ofs(filename, std::ios::trunc);
-    if (!ofs) {
-      return Unexpect(ErrCode::Value::IllegalPath);
-    }
+    // filename = filename + "_memtype.img";
+    // filename = "mem_page_count.img";
+    // std::ofstream ofs(filename, std::ios::trunc);
+    // if (!ofs) {
+    //   return Unexpect(ErrCode::Value::IllegalPath);
+    // }
+
+    // ofs << CurPageCount << std::endl;
+    // ofs.close();
 
     // PageLimitをfileにdump
     uint32_t CurPageCount = MemType.getLimit().getMin();
-    ofs << CurPageCount << std::endl;
-    ofs.close();
-
+    filename = "mem_page_count.img";
     // wamr
     std::ofstream page_count_fout;
-    page_count_fout.open("mem_page_count.img", std::ios::trunc | std::ios::binary);
+    page_count_fout.open(filename, std::ios::trunc | std::ios::binary);
     page_count_fout.write(reinterpret_cast<char *>(&CurPageCount), sizeof(CurPageCount));
 
     page_count_fout.close();
@@ -368,7 +370,8 @@ public:
   
   Expect<void> dumpDataPtr(std::string filename) {
     // Open file
-    filename = filename + "_dataptr.img";
+    // filename = filename + "_dataptr.img";
+    filename = "memory.img";
     std::ofstream ofs(filename, std::ios::trunc | std::ios::binary);
     if (!ofs) {
       return Unexpect(ErrCode::Value::IllegalPath);
@@ -424,38 +427,42 @@ public:
   
   Expect<uint32_t> restoreMemType(std::string filename) {
     // Restore MemType
-    filename = filename + "_memtype.img";
-    std::ifstream ifs(filename);
+    // filename = filename + "_memtype.img";
+    filename = "mem_page_count.img";
+    std::ifstream ifs(filename, std::ios::binary);
     if (!ifs) {
       return Unexpect(ErrCode::Value::IllegalPath);
     }
-
+    
     // TODO: バイナリで読み書きした方が良さそう
-    std::string memTypeStr;
-    getline(ifs, memTypeStr);
+    // std::string memTypeStr;
+    uint32_t mem_page_count;
+    // getline(ifs, memTypeStr);
+    ifs.read(reinterpret_cast<char*>(&mem_page_count), sizeof(uint32_t));
     ifs.close();
 
-    uint32_t memLimit;
-    try {
-      memLimit = stoi(memTypeStr);
-    } catch (const std::invalid_argument& e) {
-      std::cout << "\x1b[31m";
-      std::cout << "Error: MemTypeString[" << memTypeStr << "]: invalid argument" << std::endl;
-      std::cout << "\x1b[m";
+    // uint32_t memLimit;
+    // try {
+    //   memLimit = stoi(memTypeStr);
+    // } catch (const std::invalid_argument& e) {
+    //   std::cout << "\x1b[31m";
+    //   std::cout << "Error: MemTypeString[" << memTypeStr << "]: invalid argument" << std::endl;
+    //   std::cout << "\x1b[m";
 
-      return Unexpect(ErrCode::Value::InvalidConvToInt);
-    } catch (const std::out_of_range& e) {
-      std::cout << "\x1b[31m";
-      std::cout << "Error: MemTypeString[" << memTypeStr << "]: out of range" << std::endl;
-      std::cout << "\x1b[m";
+    //   return Unexpect(ErrCode::Value::InvalidConvToInt);
+    // } catch (const std::out_of_range& e) {
+    //   std::cout << "\x1b[31m";
+    //   std::cout << "Error: MemTypeString[" << memTypeStr << "]: out of range" << std::endl;
+    //   std::cout << "\x1b[m";
 
-      return Unexpect(ErrCode::Value::InvalidConvToInt);
-    }
-    return memLimit;
+    //   return Unexpect(ErrCode::Value::InvalidConvToInt);
+    // }
+    return mem_page_count;
   }
   
   Expect<std::vector<uint8_t>> restoreDataPtr(std::string filename) {
-    filename = filename + "_dataptr.img";
+    // filename = filename + "_dataptr.img";
+    filename = "memory.img";
     std::ifstream ifs(filename, std::ios::binary);
     if (!ifs) {
       return Unexpect(ErrCode::Value::IllegalPath);
