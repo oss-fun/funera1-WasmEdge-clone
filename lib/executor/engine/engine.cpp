@@ -1918,18 +1918,18 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
         // std::cout << "Success dumpMemory for WAMR" << std::endl;
         
         tstart = clock();
-        std::cout << "WAMR" << std::endl;
+        // std::cout << "WAMR" << std::endl;
         start = clock();
         Migr.dumpGlobal(StackMgr.getModule());
         end = clock();
-        std::cout << "global, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        std::cout << "wamr global, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
 
         
         // std::cout << "Success dumpGlobal for WAMR" << std::endl;
         start = clock();
         Migr.dumpStack(StackMgr);
         end = clock();
-        std::cout << "value stack, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        std::cout << "wamr value stack, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
         // std::cout << "Success dumpStack for WAMR" << std::endl;
 
         start = clock();
@@ -1937,24 +1937,21 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
         Migr.dumpFrame(StackMgr);
         StackMgr.popFrame();
         end = clock();
-        std::cout << "frame stack&program counter, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        std::cout << "wamr frame stack&program counter, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
 
         // For WasmEdge
-        std::cout << "WasmEdge" << std::endl;
+        // std::cout << "WasmEdge" << std::endl;
         start = clock();
         Migr.dumpIter(PC);
         end = clock();
-        std::cout << "program counter, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        std::cout << "wasmedge program counter, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
         // std::cout << "Success dumpIter" << std::endl;
-        start = clock();
         Migr.dumpStackMgrFrame(StackMgr);
-        end = clock();
-        std::cout << "frame stack, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
-        // std::cout << "Success dumpStackMgrFrame" << std::endl;
+
         start = clock();
         Migr.dumpStackMgrValue(StackMgr);
         end = clock();
-        std::cout << "value stack, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        std::cout << "wasmedge value stack, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
         // std::cout << "Success odumpStackMgrValue" << std::endl;
         // 
         tend = clock();

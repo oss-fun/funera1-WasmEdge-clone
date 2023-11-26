@@ -451,6 +451,9 @@ public:
   }
 
   void dumpStackMgrFrame(Runtime::StackManager& StackMgr, std::string fname_header = "") {
+    time_t start, end;
+    time_t mstart, mend, gstart, gend;
+    start = clock();
     std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
     std::ofstream FrameStream;
     FrameStream.open(fname_header + "stackmgr_frame.img", std::ios::trunc);
@@ -474,16 +477,15 @@ public:
 
       // まだそのModInstを保存してなければ、dumpする
       if(!seenModInst[ModName]) {
-        time_t start, end;
-        start = clock();
+        mstart = clock();
         ModInst->dumpMemInst(fname_header + std::string(ModName));
-        end = clock();
-        std::cout << ",memory, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        mend = clock();
+        std::cout << "unified memory, " << static_cast<double>(mend-mstart) / CLOCKS_PER_SEC * 1000.0 << std::endl;
 
-        start = clock();
+        gstart = clock();
         ModInst->dumpGlobInst(fname_header + std::string(ModName));
-        end = clock();
-        std::cout << ",global, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        gend = clock();
+        std::cout << "wasmedge global, " << static_cast<double>(gend-gstart) / CLOCKS_PER_SEC * 1000.0 << std::endl;
         seenModInst[ModName] = true;
       }
       
@@ -503,6 +505,8 @@ public:
     }  
     
     FrameStream.close();
+    end = clock();
+    std::cout << "wasmedge frame stack, " << static_cast<double>(end-start - (mend-mstart) - (gend-gstart)) / CLOCKS_PER_SEC * 1000.0 << std::endl;
   }
   
   void dumpStackMgrValue(Runtime::StackManager& StackMgr, std::string fname_header = "") {
