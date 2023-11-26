@@ -602,6 +602,9 @@ public:
   }
   
   Expect<std::vector<Runtime::StackManager::Frame>> restoreStackMgrFrame() {
+    time_t start, end, mstart, mend, gstart, gend;
+    start = clock(); 
+
     std::ifstream FrameStream;
     FrameStream.open("stackmgr_frame.img");
     Runtime::StackManager StackMgr;
@@ -636,19 +639,17 @@ public:
 
       /// TODO: 同じModuleの復元をしないよう、キャッシュを作る
       if (ModCache.count(ModName) == 0) {
-        time_t start, end;
-
         // restore memory
-        start = clock();
+        mstart = clock();
         ModInst->restoreMemInst(std::string(ModName));
-        end = clock();
-        std::cout << ",memory, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        mend = clock();
+        std::cout << "memory, " << static_cast<double>(mend-mstart) / CLOCKS_PER_SEC * 1000.0 << std::endl;
         
         // restore global
-        start = clock(); 
+        gstart = clock(); 
         ModInst->restoreGlobInst(std::string(ModName));
-        end = clock();
-        std::cout << ",global, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        gend = clock();
+        std::cout << "global, " << static_cast<double>(gend-gstart) / CLOCKS_PER_SEC * 1000.0 << std::endl;
         
         ModCache[ModName] = ModInst;
       }
@@ -684,6 +685,9 @@ public:
     }
 
     FrameStream.close();
+    
+    end = clock();
+    std::cout << "frame stack, " << static_cast<double>(end-start - (mend-mstart) - (gend-gstart)) / CLOCKS_PER_SEC * 1000.0 << std::endl;
     return FrameStack;
   }
   
@@ -713,11 +717,8 @@ public:
     time_t start, end;
     Runtime::StackManager StackMgr;
 
-    start = clock();
     std::vector<Runtime::StackManager::Frame> fs = restoreStackMgrFrame().value();
     StackMgr.setFrameStack(fs);
-    end = clock();
-    std::cout << "frame stack, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
 
     start = clock();
     std::vector<Runtime::StackManager::Value> vs = restoreStackMgrValue().value();
