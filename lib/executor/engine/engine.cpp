@@ -72,6 +72,8 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
       time_t start, end;
 
       tstart = clock();
+      std::cout << "boot end, " << static_cast<double>(tstart) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+
       start = clock();
       auto Res = Migr.restoreIter(Func.getModule());
       if (!Res) {
