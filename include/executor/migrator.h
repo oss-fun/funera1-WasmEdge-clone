@@ -451,9 +451,12 @@ public:
   }
 
   void dumpStackMgrFrame(Runtime::StackManager& StackMgr, std::string fname_header = "") {
-    time_t start, end;
-    time_t mstart, mend, gstart, gend;
-    start = clock();
+    // time_t start, end;
+    // time_t mstart, mend, gstart, gend;
+    struct timespec ts1, ts2, m_ts1, m_ts2, g_ts1, g_ts2;
+
+    // start = clock();
+    clock_gettime(CLOCK_MONOTONIC, &ts1);
     std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
     std::ofstream FrameStream;
     FrameStream.open(fname_header + "stackmgr_frame.img", std::ios::trunc);
@@ -477,15 +480,19 @@ public:
 
       // まだそのModInstを保存してなければ、dumpする
       if(!seenModInst[ModName]) {
-        mstart = clock();
+        // mstart = clock();
+        clock_gettime(CLOCK_MONOTONIC, &m_ts1);
         ModInst->dumpMemInst(fname_header + std::string(ModName));
-        mend = clock();
-        std::cout << "unified memory, " << static_cast<double>(mend-mstart) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        clock_gettime(CLOCK_MONOTONIC, &m_ts2);
+        // mend = clock();
+        std::cout << "unified memory, " << m_ts2.tv_nsec - m_ts1.tv_nsec << std::endl;
 
-        gstart = clock();
+        // gstart = clock();
+        clock_gettime(CLOCK_MONOTONIC, &g_ts1);
         ModInst->dumpGlobInst(fname_header + std::string(ModName));
-        gend = clock();
-        std::cout << "wasmedge global, " << static_cast<double>(gend-gstart) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        clock_gettime(CLOCK_MONOTONIC, &g_ts2);
+        // gend = clock();
+        std::cout << "wasmedge global, " << g_ts2.tv_nsec - g_ts1.tv_nsec << std::endl;
         seenModInst[ModName] = true;
       }
       
@@ -505,8 +512,9 @@ public:
     }  
     
     FrameStream.close();
-    end = clock();
-    std::cout << "wasmedge frame stack, " << static_cast<double>(end-start - (mend-mstart) - (gend-gstart)) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+    // end = clock();
+    clock_gettime(CLOCK_MONOTONIC, &ts2);
+    std::cout << "wasmedge frame stack, " << ts2.tv_nsec - ts1.tv_nsec << std::endl;
   }
   
   void dumpStackMgrValue(Runtime::StackManager& StackMgr, std::string fname_header = "") {
@@ -602,8 +610,10 @@ public:
   }
   
   Expect<std::vector<Runtime::StackManager::Frame>> restoreStackMgrFrame() {
-    time_t start, end, mstart, mend, gstart, gend;
-    start = clock(); 
+    // time_t start, end, mstart, mend, gstart, gend;
+    struct timespec ts1, ts2, m_ts1, m_ts2, g_ts1, g_ts2;
+    clock_gettime(CLOCK_MONOTONIC, &ts1);
+    // start = clock(); 
 
     std::ifstream FrameStream;
     FrameStream.open("stackmgr_frame.img");
@@ -640,16 +650,17 @@ public:
       /// TODO: 同じModuleの復元をしないよう、キャッシュを作る
       if (ModCache.count(ModName) == 0) {
         // restore memory
-        mstart = clock();
+        // mstart = clock();
+        clock_gettime(CLOCK_MONOTONIC, &m_ts1);
         ModInst->restoreMemInst(std::string(ModName));
-        mend = clock();
-        std::cout << "memory, " << static_cast<double>(mend-mstart) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        clock_gettime(CLOCK_MONOTONIC, &m_ts2);
+        std::cout << "memory, " << m_ts2.tv_nsec - m_ts1.tv_nsec << std::endl;
         
         // restore global
-        gstart = clock(); 
+        clock_gettime(CLOCK_MONOTONIC, &g_ts1);
         ModInst->restoreGlobInst(std::string(ModName));
-        gend = clock();
-        std::cout << "global, " << static_cast<double>(gend-gstart) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        clock_gettime(CLOCK_MONOTONIC, &g_ts2);
+        std::cout << "global, " << g_ts2.tv_nsec - g_ts1.tv_nsec << std::endl;
         
         ModCache[ModName] = ModInst;
       }
@@ -686,8 +697,8 @@ public:
 
     FrameStream.close();
     
-    end = clock();
-    std::cout << "frame stack, " << static_cast<double>(end-start - (mend-mstart) - (gend-gstart)) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+    clock_gettime(CLOCK_MONOTONIC, &ts2);
+    std::cout << "frame stack, " << ts2.tv_nsec - ts1.tv_nsec << std::endl;
     return FrameStack;
   }
   
@@ -714,17 +725,20 @@ public:
   }
 
   Expect<Runtime::StackManager> restoreStackMgr() {
-    time_t start, end;
+    // time_t start, end;
+    struct timespec ts1, ts2;
     Runtime::StackManager StackMgr;
 
     std::vector<Runtime::StackManager::Frame> fs = restoreStackMgrFrame().value();
     StackMgr.setFrameStack(fs);
 
-    start = clock();
+    // start = clock();
+    clock_gettime(CLOCK_MONOTONIC, &ts1);
     std::vector<Runtime::StackManager::Value> vs = restoreStackMgrValue().value();
     StackMgr.setValueStack(vs);
-    end = clock();
-    std::cout << "value stack, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+    // end = clock();
+    clock_gettime(CLOCK_MONOTONIC, &ts2);
+    std::cout << "value stack, " << ts2.tv_nsec - ts1.tv_nsec << std::endl;
 
     return StackMgr;
   }

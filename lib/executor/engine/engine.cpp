@@ -68,24 +68,23 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
     // Restore
     if (RestoreFlag && Conf.getStatisticsConfigure().getRestoreFlag()) {
       // std::cout << "### Restore! ###" << std::endl;
-      time_t tstart, tend;
-      time_t start, end;
+      struct timespec ts1, ts2, t_ts1, t_ts2;
 
-      tstart = clock();
-      std::cout << "boot end, " << static_cast<double>(tstart) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+      clock_gettime(CLOCK_MONOTONIC, &t_ts1);
+      std::cout << "boot end, " << t_ts1.tv_nsec << std::endl;
 
-      start = clock();
+      clock_gettime(CLOCK_MONOTONIC, &ts1);
       auto Res = Migr.restoreIter(Func.getModule());
       if (!Res) {
         return Unexpect(Res);
       }
       StartIt = Res.value();
-      end = clock();
-      std::cout << "program counter, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+      clock_gettime(CLOCK_MONOTONIC, &ts2);
+      std::cout << "program counter, " << ts2.tv_nsec - ts1.tv_nsec << std::endl;
 
       StackMgr = Migr.restoreStackMgr().value();
-      tend = clock();
-      std::cout << "total, " << static_cast<double>(tend-tstart) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+      clock_gettime(CLOCK_MONOTONIC, &t_ts2);
+      std::cout << "total, " << t_ts2.tv_nsec - t_ts1.tv_nsec << std::endl;
 
       RestoreFlag = false;
     }
@@ -1913,51 +1912,64 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
 
     if (DumpFlag) {
       if (Conf.getStatisticsConfigure().getDumpFlag()) {
-        time_t tstart, tend;
-        time_t start, end;
+        // time_t tstart, tend;
+        // time_t start, end;
+        struct timespec ts1, ts2, t_ts1, t_ts2;
         // For WAMR
         // Migr.dumpMemory(StackMgr.getModule());
         // std::cout << "Success dumpMemory for WAMR" << std::endl;
         
-        tstart = clock();
+        clock_gettime(CLOCK_MONOTONIC, &t_ts1);
+        clock_gettime(CLOCK_MONOTONIC, &ts1);
+        // tstart = clock();
         // std::cout << "WAMR" << std::endl;
-        start = clock();
+        // start = clock();
         Migr.dumpGlobal(StackMgr.getModule());
-        end = clock();
-        std::cout << "wamr global, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        // end = clock();
+        clock_gettime(CLOCK_MONOTONIC, &ts2);
+        std::cout << "wamr global, " << ts2.tv_nsec - ts1.tv_nsec << std::endl;
 
         
         // std::cout << "Success dumpGlobal for WAMR" << std::endl;
-        start = clock();
+        // start = clock();
+        clock_gettime(CLOCK_MONOTONIC, &ts1);
         Migr.dumpStack(StackMgr);
-        end = clock();
-        std::cout << "wamr value stack, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        // end = clock();
+        clock_gettime(CLOCK_MONOTONIC, &ts2);
+        std::cout << "wamr value stack, " << ts2.tv_nsec - ts1.tv_nsec << std::endl;
         // std::cout << "Success dumpStack for WAMR" << std::endl;
 
-        start = clock();
+        // start = clock();
+        clock_gettime(CLOCK_MONOTONIC, &ts1);
         StackMgr.pushFrame(StackMgr.getModule(), PC, 0, 0, false);
         Migr.dumpFrame(StackMgr);
         StackMgr.popFrame();
-        end = clock();
-        std::cout << "wamr frame stack&program counter, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        // end = clock();
+        clock_gettime(CLOCK_MONOTONIC, &ts2);
+        std::cout << "wamr frame stack&program counter, " << ts2.tv_nsec - ts1.tv_nsec << std::endl;
 
         // For WasmEdge
         // std::cout << "WasmEdge" << std::endl;
-        start = clock();
+        // start = clock();
+        clock_gettime(CLOCK_MONOTONIC, &ts1);
         Migr.dumpIter(PC);
-        end = clock();
-        std::cout << "wasmedge program counter, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        // end = clock();
+        clock_gettime(CLOCK_MONOTONIC, &ts2);
+        std::cout << "wasmedge program counter, " << ts2.tv_nsec - ts1.tv_nsec << std::endl;
         // std::cout << "Success dumpIter" << std::endl;
         Migr.dumpStackMgrFrame(StackMgr);
 
-        start = clock();
+        // start = clock();
+        clock_gettime(CLOCK_MONOTONIC, &ts1);
         Migr.dumpStackMgrValue(StackMgr);
-        end = clock();
-        std::cout << "wasmedge value stack, " << static_cast<double>(end-start) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        clock_gettime(CLOCK_MONOTONIC, &ts2);
+        std::cout << "wasmedge value stack, " << ts2.tv_nsec - ts1.tv_nsec << std::endl;
         // std::cout << "Success odumpStackMgrValue" << std::endl;
         // 
-        tend = clock();
-        std::cout << "total, " << static_cast<double>(tend-tstart) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+        // tend = clock();
+        clock_gettime(CLOCK_MONOTONIC, &t_ts2);
+        std::cout << "total, " << t_ts2.tv_nsec - t_ts1.tv_nsec << std::endl;
+        // std::cout << "total, " << static_cast<double>(tend-tstart) / CLOCKS_PER_SEC * 1000.0 << std::endl;
       }
       return {};
     }

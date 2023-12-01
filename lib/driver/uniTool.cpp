@@ -14,9 +14,10 @@ namespace WasmEdge {
 namespace Driver {
 
 int UniTool(int Argc, const char *Argv[], const ToolType ToolSelect) noexcept {
-  time_t time;
-  time = clock();
-  std::cout << "boot start, " << static_cast<double>(time) / CLOCKS_PER_SEC * 1000.0 << std::endl;
+  // time_t time;
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  std::cout << "boot start, " << ts.tv_nsec << std::endl;
   using namespace std::literals;
 
   std::ios::sync_with_stdio(false);
