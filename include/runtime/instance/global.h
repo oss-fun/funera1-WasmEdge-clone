@@ -41,36 +41,38 @@ public:
 
   // Migration functions
   // filename = globinst_{i}
-  void dump(std::string filename) const noexcept {
-    std::ofstream valueStream;
-
+  Expect<void> dump(std::string filename) const noexcept {
     // Open file
-    std::string valueFile = filename + "_value.img";
-    valueStream.open(valueFile, std::ios::trunc);
+    filename = filename + "global.img";
+    std::ofstream ofs(filename, std::ios::trunc | std::ios::binary);
+    if (!ofs) {
+      return Unexpect(ErrCode::Value::IllegalPath);
+    }
 
     // TODO: uint32_t型以外の場合どうなるのか(int32_tとかは同じ値が出力された)
     ValType T = GlobType.getValType();
     if (T == ValType::I32 || T == ValType::F32) {
-      valueStream << std::setw(32) << std::setfill('0') << Value.get<uint32_t>() << std::endl;
+      ofs.write(reinterpret_cast<char*>(Value.get<uint32_t>()), sizeof(uint32_t));
     }
     else if (T == ValType::I64 || T == ValType::F64) {
-      valueStream << std::setw(64) << std::setfill('0') << Value.get<uint64_t>() << std::endl;
+      ofs.write(reinterpret_cast<char*>(Value.get<uint64_t>()), sizeof(uint64_t));
     }
     else {
-      valueStream << std::setw(128) << std::setfill('0') << Value.get<uint128_t>() << std::endl;
+      ofs.write(reinterpret_cast<char*>(Value.get<uint128_t>()), sizeof(uint128_t));
     }
 
     // Close file
-    valueStream.close();
+    ofs.close();
+    return {};
   }
 
-  void restore(std::string filename)  noexcept {
-    // restoreFileをparseする
-    std::ifstream valueStream;
-
+  Expect<void> restore(std::string filename)  noexcept {
     // Open file
-    std::string valueFile = filename + "_value.img";
-    valueStream.open(valueFile);
+    filename = filename + "global.img";
+    std::ifstream ifs(filename, std::ios::binary);
+    if (!ifs) {
+      return Unexpect(ErrCode::Value::IllegalPath);
+    }
 
     // Restore Value
     std::string valueString;
