@@ -78,20 +78,12 @@ public:
   template <typename T> void push(T &&Val) {
     ValueStack.push_back(std::forward<T>(Val));
     // 32bitなら0, 64bitなら1
-<<<<<<< HEAD
     size_t t = sizeof(T);
     if (t == 4) {
       TypeStack.push_back((uint8_t)0);
     }
     else if (t == 8) {
       TypeStack.push_back((uint8_t)1);
-=======
-    if (sizeof(T) == 4) {
-      TypeStack.push_back(std::forward<uint8_t>(0));
-    }
-    else if (sizeof(T) == 8) {
-      TypeStack.push_back(std::forward<uint8_t>(1));
->>>>>>> cb3bc2e94906128bc2f3a2db6fe27ea8fcd7032e
     }
     else {
       TypeStack.push_back(std::forward<uint8_t>(2));
