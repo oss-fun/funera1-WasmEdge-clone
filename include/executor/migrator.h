@@ -141,10 +141,6 @@ public:
   /// ================
   /// Dump functions for WAMR
   /// ================
-  void dumpMemory(const Runtime::Instance::ModuleInstance* ModInst) {
-    ModInst->dumpMemInst("wamr");
-  }
-  
   void dumpGlobal(const Runtime::Instance::ModuleInstance* ModInst) {
     ModInst->dumpGlobInst("wamr");
   }
@@ -184,8 +180,10 @@ public:
     uint32_t BeginAddrOfs;
     uint32_t TargetAddrOfs;
     uint32_t ElseAddrOfs;
+    uint32_t TspOfs;
     uint32_t SpOfs;
     uint32_t ResultCells;
+    uint32_t ResultCount;
   };
 
   std::vector<struct CtrlInfo> getCtrlStack(const AST::InstrView::iterator PCNow, Runtime::Instance::FunctionInstance *Func, const std::vector<uint32_t> &WamrCellSums) {
@@ -200,11 +198,11 @@ public:
     
     uint32_t BaseAddr = PCStart->getOffset();
 
-    auto CtrlPush = [&](AST::InstrView::iterator Begin, AST::InstrView::iterator Target, uint32_t SpOfs) {
+    auto CtrlPush = [&](AST::InstrView::iterator Begin, AST::InstrView::iterator Target, uint32_t SpOfs, uint32_t TspOfs) {
       uint32_t BeginOfs = Begin->getOffset() - BaseAddr;
       uint32_t TargetOfs = Target->getOffset() - BaseAddr;
       uint32_t ElseOfs = (Begin + Begin->getJumpElse())->getOffset() - BaseAddr;
-      CtrlStack.push_back({BeginOfs, TargetOfs, ElseOfs, SpOfs, 0});
+      CtrlStack.push_back({BeginOfs, TargetOfs, ElseOfs, SpOfs, TspOfs, 0, 0});
     };
     
     auto CtrlPop = [&]() {
@@ -217,8 +215,8 @@ public:
     
     // 関数ブロックを一番最初にpushする
     // ダミーブロックぽさがすこしあるので、適当に入れる（ちゃんとやると、target_addrに関数の一番最後のアドレスを入れる必要があり、無駄が増えるため）
-    uint32_t SpOfs;
-    CtrlPush(PCStart, PCEnd-1, 0);
+    uint32_t SpOfs, TspOfs;
+    CtrlPush(PCStart, PCEnd-1, 0, 0);
 
     // 命令をなめる
     while (PC < PCNow) {
@@ -227,11 +225,13 @@ public:
         case OpCode::Block:
         case OpCode::If:
           SpOfs = WamrCellSums[PC->getJump().StackEraseBegin];
-          CtrlPush(PC+1, PC+PC->getJumpEnd(), SpOfs);
+          TspOfs = PC->getJump().StackEraseBegin;
+          CtrlPush(PC+1, PC+PC->getJumpEnd(), SpOfs, TspOfs);
           break;
         case OpCode::Loop:
           SpOfs = WamrCellSums[PC->getJump().StackEraseBegin];
-          CtrlPush(PC+1, PC+1, SpOfs);
+          TspOfs = PC->getJump().StackEraseBegin;
+          CtrlPush(PC+1, PC+1, SpOfs, TspOfs);
           break;
 
         // pop
@@ -266,8 +266,10 @@ public:
     for (uint32_t I = 0; I < TypeStack.size(); I++) {
         WamrCellSums[I+1] = WamrCellSums[I] + (TypeStack[I] == 0 ? 1 : 2);
     }
-    std::ofstream fout;
+    std::ofstream fout, csp_tsp_fout, tsp_fout, tsp2_fout;
     fout.open("wamr_frame.img", std::ios::trunc);
+    csp_tsp_fout.open("ctrl_tsp.img", std::ios::trunc | std::ios::binary);
+    tsp_fout.open("type_stack.img", std::ios::trunc | std::ios::binary);
     
     auto dump = [&](std::string desc, auto val, std::string end = "\n") {
       fout << desc << std::endl;
@@ -287,6 +289,7 @@ public:
     uint32_t CurrentIpOfs;
     uint32_t CurrentSpOfs;
     uint32_t CurrentCspOfs;
+    uint32_t CurrentTspOfs;
 
     fout << "frame num" << std::endl;
     // I=1のとき飛ばすから-1
@@ -333,6 +336,8 @@ public:
         // csp_offset
         CurrentCspOfs = CtrlStack.size();
         dump("csp_offset", CurrentCspOfs);
+        // tsp offset
+        CurrentTspOfs = TypeStack.size();
         // lp (params, locals)
         dump("lp_num", pf.Locals, "");
         fout << "lp(params, locals)" << std::endl;
@@ -347,18 +352,21 @@ public:
         }
         fout << std::endl;
 
-        // stack
+        // value stack
         dump("stack_num", (f.VPos-f.Locals) - pf.VPos, "");
 
         fout << "stack" << std::endl;
         for (uint32_t I = pf.VPos; I < f.VPos-f.Locals; I++) {
           Value V = ValueStack[I];
-          uint8_t T = TypeStack[I];
+          uint32_t T = static_cast<uint32_t>(TypeStack[I]);
 
           if (T == 0) 
             fout << std::setw(32) << std::setfill('0') << V.get<uint32_t>() << std::endl;
           else  
             fout << std::setw(64) << std::setfill('0') << V.get<uint64_t>() << std::endl;
+          
+          // type stack
+          tsp_fout.write(reinterpret_cast<char *>(&T), sizeof(T));
         }
         fout << std::endl;
         
@@ -373,10 +381,14 @@ public:
           fout << info.BeginAddrOfs << std::endl;
           // cps->target_addr_offset
           fout << info.TargetAddrOfs << std::endl;
-          // csp->sp_offset
+          // csp->frame_sp_offset
           fout << info.SpOfs << std::endl;
+          // csp->frame_tsp_offset
+          csp_tsp_fout.write(reinterpret_cast<char *>(&info.TspOfs), sizeof(info.TspOfs));
           // csp->cell_num
           fout << info.ResultCells << std::endl;
+          // csp->count
+          csp_tsp_fout.write(reinterpret_cast<char *>(&info.ResultCount), sizeof(info.ResultCount));
         }
       }
       fout << "===" << std::endl;
@@ -385,7 +397,9 @@ public:
 
 
     /// Addr.img
+    std::ofstream tsp_addr_fout;
     fout.open("wamr_addrs.img", std::ios::trunc);
+    tsp_addr_fout.open("tsp_addr.img", std::ios::trunc | std::ios::binary);
 
     // ip_ofs
     dump("ip_ofs", CurrentIpOfs);
@@ -393,6 +407,8 @@ public:
     dump("sp_ofs", CurrentSpOfs);
     // csp_ofs
     dump("csp_ofs", CurrentCspOfs);
+    // tsp_ofs
+    tsp_addr_fout.write(reinterpret_cast<char *>(&CurrentTspOfs), sizeof(CurrentTspOfs));
 
     struct CtrlInfo CtrlTop = CtrlStack.back();
     // else_addr
@@ -401,8 +417,13 @@ public:
     dump("end_addr", CtrlTop.TargetAddrOfs);
     // done flag
     dump("done_flag", 1);
+    
+    
 
     fout.close();
+    csp_tsp_fout.close();
+    tsp_fout.close();
+    tsp_addr_fout.close();
   }
 
   /// ================
@@ -580,7 +601,6 @@ public:
       // ModuleInstance
       std::string ModName = FrameString;
       const Runtime::Instance::ModuleInstance* ModInst;
-      // std::cout << "restore frame: 1" << std::endl;
 
       // ModInstがnullの場合
       if (ModName == NULL_MOD_NAME) {
@@ -596,26 +616,19 @@ public:
 
       // ModInstがnullじゃない場合
       ModInst = findModule(ModName);
-      // std::cout << "restored ModName is " << ModName << std::endl;
       if (ModInst == nullptr) {
-        // std::cout << "ModInst is nullptr" << std::endl;
         assert(-1);
       }
-      // std::cout << "restore frame: 2" << std::endl;
 
       /// TODO: 同じModuleの復元をしないよう、キャッシュを作る
       if (ModCache.count(ModName) == 0) {
-        // std::cout << ModInst->getMemoryNum() << std::endl;
         ModInst->restoreMemInst(std::string(ModName));
-        // std::cout << "Success restore meminst" << std::endl;
         ModInst->restoreGlobInst(std::string(ModName));
-        // std::cout << "Success restore globinst" << std::endl;
         ModCache[ModName] = ModInst;
       }
       else {
         ModInst = ModCache[ModName];
       }
-      // std::cout << "restore frame: 3" << std::endl;
 
       // Iterator
       getline(FrameStream, FrameString);
@@ -628,7 +641,6 @@ public:
       }
       AST::InstrView::iterator From = Res.value();
       // AST::InstrView::iterator From = _restoreIter(ModInst, FuncIdx, Offset).value();
-      // std::cout << "restore frame: 4" << std::endl;
 
       // Locals, VPos, Arity
       getline(FrameStream, FrameString);
@@ -637,7 +649,6 @@ public:
       uint32_t VPos = static_cast<uint32_t>(std::stoul(FrameString));
       getline(FrameStream, FrameString);
       uint32_t Arity = static_cast<uint32_t>(std::stoul(FrameString));
-      // std::cout << "restore frame: 5" << std::endl;
 
       Runtime::StackManager::Frame f(ModInst, From, Locals, Arity, VPos);
       FrameStack.push_back(f);
@@ -673,17 +684,9 @@ public:
   }
 
   Expect<Runtime::StackManager> restoreStackMgr() {
-    // auto Res = restoreStackMgrFrame().value;
-    // if (!Res) {
-    //   // return Unexpect(Res);
-    // }
     std::vector<Runtime::StackManager::Frame> fs = restoreStackMgrFrame().value();
     std::cout << "Success to restore stack frame" << std::endl;
 
-    // Res = restoreStackMgrValue();
-    // if (!Res) {
-    //   return Unexpect(Res);
-    // }
     std::vector<Runtime::StackManager::Value> vs = restoreStackMgrValue().value();
     std::cout << "Success to restore stack value" << std::endl;
 
