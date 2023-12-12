@@ -184,18 +184,31 @@ public:
   void dumpMemInst(std::string name) const noexcept {
     // std::unique_lock Lock(Mutex);
     // MemoryInstanceの保存
+    name = "hoge";
     for (uint32_t I = 0; I < getMemoryNum(); ++I) {
         auto Res = getMemory(I);
         MemoryInstance* MemInst = Res.value();
-        MemInst->dump(name + "_meminst_" + std::to_string(I));
+        if (I == 0) {
+            MemInst->dump("");
+        }
+        else {
+            MemInst->dump(std::to_string(I));
+        }
     }
   }
 
   void restoreMemInst(std::string name) const noexcept {
+    name = "hoge";
     for (uint32_t I = 0; I < getMemoryNum(); ++I) {
       auto Res = getMemory(I);
       MemoryInstance* MemInst = Res.value();
-      MemInst->restore(name + "_meminst_" + std::to_string(I));
+      if (I == 0) {
+          MemInst->restore("");
+      }
+      else {
+          MemInst->restore(std::to_string(I));
+      }
+
     }
   }
   
