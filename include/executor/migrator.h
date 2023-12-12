@@ -436,13 +436,16 @@ public:
     // assert(IterMigrator);
 
     struct SourceLoc Data = IterMigrator[Iter];
-    std::ofstream iterStream;
-    iterStream.open(fname_header + "iter.img", std::ios::trunc);
+    std::ofstream ofs(fname_header + "program_counter.img", std::ios::trunc | std::ios::binary);
 
-    iterStream << Data.FuncIdx << std::endl;
-    iterStream << Data.Offset;
+    // offsetがWAMR仕様(命令と引数が混在)とする
+    ofs.write(reinterpret_cast<char *>(&Data.FuncIdx), sizeof(uint32_t));
+    ofs.write(reinterpret_cast<char *>(&));
+
+    // iterStream << Data.FuncIdx << std::endl;
+    // iterStream << Data.Offset;
       
-    iterStream.close();
+    ofs.close();
   }
 
   void dumpStackMgrFrame(Runtime::StackManager& StackMgr, std::string fname_header = "") {
