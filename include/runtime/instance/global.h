@@ -39,49 +39,46 @@ public:
   /// Getter of value.
   ValVariant &getValue() noexcept { return Value; }
 
-  // Migration functions
-  // filename = globinst_{i}
-  Expect<void> dump(std::string filename) const noexcept {
-    // Open file
-    filename = filename + "global.img";
-    std::ofstream ofs(filename, std::ios::trunc | std::ios::binary);
-    if (!ofs) {
-      return Unexpect(ErrCode::Value::IllegalPath);
-    }
-
+  void dump(std::ofstream &ofs) const noexcept {
     // TODO: uint32_t型以外の場合どうなるのか(int32_tとかは同じ値が出力された)
-    ValType T = GlobType.getValType();
-    if (T == ValType::I32 || T == ValType::F32) {
-      ofs.write(reinterpret_cast<char*>(Value.get<uint32_t>()), sizeof(uint32_t));
-    }
-    else if (T == ValType::I64 || T == ValType::F64) {
-      ofs.write(reinterpret_cast<char*>(Value.get<uint64_t>()), sizeof(uint64_t));
-    }
-    else {
-      ofs.write(reinterpret_cast<char*>(Value.get<uint128_t>()), sizeof(uint128_t));
-    }
+    uint32_t v32;
+    uint64_t v64;
+    uint128_t v128;
 
-    // Close file
-    ofs.close();
-    return {};
+    switch (GlobType.getValType()) {
+      case ValType::I32:
+      case ValType::F32:
+        v32 = Value.get<uint32_t>();
+        ofs.write(reinterpret_cast<char*>(&v32), sizeof(uint32_t));
+        break;
+      case ValType::I64:
+      case ValType::F64:
+        v64 = Value.get<uint64_t>();
+        ofs.write(reinterpret_cast<char*>(&v64), sizeof(uint64_t));
+        break;
+      default:
+        v128 = Value.get<uint128_t>();
+        ofs.write(reinterpret_cast<char*>(&v128), sizeof(uint128_t));
+        break;
+    }
   }
 
-  Expect<void> restore(std::string filename)  noexcept {
-    // Open file
-    filename = filename + "global.img";
-    std::ifstream ifs(filename, std::ios::binary);
-    if (!ifs) {
-      return Unexpect(ErrCode::Value::IllegalPath);
+  void restore(std::ifstream &ifs)  noexcept {
+    switch (GlobType.getValType()) {
+      case ValType::I32:
+      case ValType::F32:
+        ifs.read(reinterpret_cast<char*>(&Value), sizeof(uint32_t));
+        break;
+      case ValType::I64:
+      case ValType::F64:
+        ifs.read(reinterpret_cast<char*>(&Value), sizeof(uint64_t));
+        break;
+      default:
+        ifs.read(reinterpret_cast<char*>(&Value), sizeof(uint128_t));
+        break;
     }
-
-    // Restore Value
-    std::string valueString;
-    getline(valueStream, valueString);
-    Value = static_cast<uint128_t>(std::stoul(valueString));
-
-    // Close file
-    valueStream.close();
   }
+
 private:
   /// \name Data of global instance.
   /// @{

@@ -199,27 +199,36 @@ public:
     }
   }
   
-  void dumpGlobInst(std::string name) const noexcept {
-    // std::unique_lock Lock(Mutex);
-    // GlobalInstanceの保存
+  Expect<void> dumpGlobInst(std::string name) const noexcept {
+    name += "global.img";
+    std::ofstream ofs(name, std::ios::trunc | std::ios::binary);
+    if (!ofs) {
+      return Unexpect(ErrCode::Value::IllegalPath);
+    }
+
     for (uint32_t I = 0; I < getGlobalNum(); ++I) {
         auto Res = getGlobal(I);
         GlobalInstance* GlobInst = Res.value();
-        GlobInst->dump(name + "_globinst_" + std::to_string(I));
+        GlobInst->dump(ofs);
     }
+    return {};
   }
 
-  void restoreGlobInst(std::string name) const noexcept {
+  Expect<void> restoreGlobInst(std::string name) const noexcept {
+    name += "global.img";
+    std::ifstream ifs(name, std::ios::binary);
+    if (!ifs) {
+      return Unexpect(ErrCode::Value::IllegalPath);
+    }
+
     // std::unique_lock Lock(Mutex);
     for (uint32_t I = 0; I < getGlobalNum(); ++I) {
         auto Res = getGlobal(I);
         GlobalInstance* GlobInst = Res.value();
-        GlobInst->restore(name + "_globinst_" + std::to_string(I));
+        GlobInst->restore(ifs);
     }
+    return {};
   }
-
-  // void restore(std::ifstream &restoreFile) const noexcept {
-  // }
 
 protected:
   friend class Executor::Executor;

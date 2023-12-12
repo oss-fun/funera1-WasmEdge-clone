@@ -1912,8 +1912,6 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
         // For WAMR
         // Migr.dumpMemory(StackMgr.getModule());
         // std::cout << "Success dumpMemory for WAMR" << std::endl;
-        Migr.dumpGlobal(StackMgr.getModule());
-        std::cout << "Success dumpGlobal for WAMR" << std::endl;
         Migr.dumpStack(StackMgr);
         std::cout << "Success dumpStack for WAMR" << std::endl;
 

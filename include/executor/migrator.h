@@ -141,10 +141,6 @@ public:
   /// ================
   /// Dump functions for WAMR
   /// ================
-  void dumpGlobal(const Runtime::Instance::ModuleInstance* ModInst) {
-    ModInst->dumpGlobInst("wamr");
-  }
-  
   void dumpStack(Runtime::StackManager& StackMgr) {
     std::ofstream fout;
     // fout.open("wamr_stack.img", std::ios::out | std::ios::binary | std::ios::trunc);
