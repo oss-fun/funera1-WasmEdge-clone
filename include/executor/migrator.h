@@ -430,21 +430,38 @@ public:
     setIterMigrator(ModInst);
     BaseModName = ModInst->getModuleName();
   }
-  
-  void dumpIter(AST::InstrView::iterator Iter, std::string fname_header = "") {
+
+  Expect<void> dumpProgramCounter(AST::InstrView::iterator Iter) {
     IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
     // assert(IterMigrator);
 
     struct SourceLoc Data = IterMigrator[Iter];
-    std::ofstream ofs(fname_header + "program_counter.img", std::ios::trunc | std::ios::binary);
+    std::ofstream ofs("program_counter.img", std::ios::trunc | std::ios::binary);
+    if (!ofs) {
+      return Unexpect(ErrCode::Value::IllegalPath);
+    }
 
-    // offsetがWAMR仕様(命令と引数が混在)とする
     uint32_t Offset = Iter->getOffset();
     ofs.write(reinterpret_cast<char *>(&Data.FuncIdx), sizeof(uint32_t));
     ofs.write(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
 
     ofs.close();
+    return {};
   }
+  
+  // void dumpIter(AST::InstrView::iterator Iter, std::string fname_header = "") {
+  //   IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
+  //   // assert(IterMigrator);
+
+  //   struct SourceLoc Data = IterMigrator[Iter];
+  //   std::ofstream iterStream;
+  //   iterStream.open(fname_header + "iter.img", std::ios::trunc);
+
+  //   iterStream << Data.FuncIdx << std::endl;
+  //   iterStream << Data.Offset;
+      
+  //   iterStream.close();
+  // }
 
   void dumpStackMgrFrame(Runtime::StackManager& StackMgr, std::string fname_header = "") {
     std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
