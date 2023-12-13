@@ -70,7 +70,7 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
     // Restore
     if (RestoreFlag && Conf.getStatisticsConfigure().getRestoreFlag()) {
       // std::cout << "### Restore! ###" << std::endl;
-      auto Res = Migr.restoreIter(Func.getModule());
+      auto Res = Migr.restoreProgramCounter(Func.getModule());
       if (!Res) {
         return Unexpect(Res);
       }
@@ -1921,7 +1921,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
         StackMgr.popFrame();
 
         // For WasmEdge
-        Migr.dumpIter(PC);
+        Migr.dumpProgramCounter(StackMgr.getModule(), PC);
         std::cout << "Success dumpIter" << std::endl;
         Migr.dumpStackMgrFrame(StackMgr);
         std::cout << "Success dumpStackMgrFrame" << std::endl;

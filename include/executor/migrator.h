@@ -397,8 +397,6 @@ public:
     fout.open("wamr_addrs.img", std::ios::trunc);
     tsp_addr_fout.open("tsp_addr.img", std::ios::trunc | std::ios::binary);
 
-    // ip_ofs
-    dump("ip_ofs", CurrentIpOfs);
     // sp_ofs
     dump("sp_ofs", CurrentSpOfs);
     // csp_ofs
@@ -414,8 +412,6 @@ public:
     // done flag
     dump("done_flag", 1);
     
-    
-
     fout.close();
     csp_tsp_fout.close();
     tsp_fout.close();
@@ -430,21 +426,33 @@ public:
     setIterMigrator(ModInst);
     BaseModName = ModInst->getModuleName();
   }
-  
-  void dumpIter(AST::InstrView::iterator Iter, std::string fname_header = "") {
+
+  Expect<void> dumpProgramCounter(const Runtime::Instance::ModuleInstance* ModInst, AST::InstrView::iterator Iter) {
     IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
     // assert(IterMigrator);
 
     struct SourceLoc Data = IterMigrator[Iter];
-    std::ofstream iterStream;
-    iterStream.open(fname_header + "iter.img", std::ios::trunc);
+    std::ofstream ofs("program_counter.img", std::ios::trunc | std::ios::binary);
+    if (!ofs) {
+      return Unexpect(ErrCode::Value::IllegalPath);
+    }
 
-    iterStream << Data.FuncIdx << std::endl;
-    iterStream << Data.Offset;
-      
-    iterStream.close();
+    auto Res = ModInst->getFunc(Data.FuncIdx);
+    if (unlikely(!Res)) {
+      return Unexpect(Res);
+    }
+    Runtime::Instance::FunctionInstance* FuncInst = Res.value();
+    AST::InstrView::iterator PCStart = FuncInst->getInstrs().begin();
+
+
+    uint32_t Offset = Iter->getOffset() - PCStart->getOffset();
+    ofs.write(reinterpret_cast<char *>(&Data.FuncIdx), sizeof(uint32_t));
+    ofs.write(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
+
+    ofs.close();
+    return {};
   }
-
+  
   void dumpStackMgrFrame(Runtime::StackManager& StackMgr, std::string fname_header = "") {
     std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
     std::ofstream FrameStream;
@@ -525,62 +533,54 @@ public:
     AST::InstrView::iterator Iter = FuncInst->getInstrs().begin();
     assert(Iter != nullptr);
 
-    for (uint32_t I = 0; I < Offset; ++I) {
-      Iter++;
-    }
+    Iter += Offset;
+
     return Iter;
   }
 
-  Expect<AST::InstrView::iterator> restoreIter(const Runtime::Instance::ModuleInstance* ModInst) {
-    std::ifstream iterStream;
-    iterStream.open("iter.img");
+  // 命令と引数が混在したOffsetの復元
+  Expect<AST::InstrView::iterator> _restorePC(const Runtime::Instance::ModuleInstance* ModInst, uint32_t FuncIdx, uint32_t Offset) {
+    assert(ModInst != nullptr);
     
-    std::string iterString;
-    uint32_t FuncIdx, Offset;
-    // FuncIdx
-    getline(iterStream, iterString);
-    try {
-      FuncIdx = static_cast<uint32_t>(std::stoul(iterString));
-    } catch (const std::invalid_argument& e) {
-      std::cout << "\x1b[31m";
-      std::cout << "FuncIdx[" << iterString << "]: invalid argument" << std::endl;
-      std::cout << "\x1b[m";
-      // return Unexpect(ErrCode::Value::UserDefError);
-    } catch (const std::out_of_range& e) {
-      std::cout << "\x1b[31m";
-      std::cout << "FuncIdx[" << iterString << "]: out of range" << std::endl;
-      std::cout << "\x1b[m";
-      // return Unexpect(e);        // Data = convertIterForWamr(f.From);
-        // const AST::Instruction &Instr = *(f.From);
-    }
-    // Offset
-    getline(iterStream, iterString);
-    try {
-      Offset = static_cast<uint32_t>(std::stoul(iterString));
-    } catch (const std::invalid_argument& e) {
-      std::cout << "\x1b[31m";
-      std::cout << "Offset[" << iterString << "]: invalid argument" << std::endl;
-      std::cout << "\x1b[m";
-      // return Unexpect(e);
-    } catch (const std::out_of_range& e) {
-      std::cout << "\x1b[31m";
-      std::cout << "Offset[" << iterString << "]: out of range" << std::endl;
-      std::cout << "\x1b[m";
-      // return Unexpect(e);
-    }
-
-    iterStream.close();
-
-    // std::cout << FuncIdx << " " << Offset << std::endl;
-    
-    // FuncIdxとOffsetからitertorを復元
-    auto Res = _restoreIter(ModInst, FuncIdx, Offset);
-    if (!Res) {
+    auto Res = ModInst->getFunc(FuncIdx);
+    if (unlikely(!Res)) {
+      // spdlog::error(ErrInfo::InfoAST(ASTNodeAttr::Seg_Element));
       return Unexpect(Res);
     }
+    Runtime::Instance::FunctionInstance* FuncInst = Res.value();
+    assert(FuncInst != nullptr);
 
-    auto Iter = Res.value();
-    return Iter;
+    AST::InstrView::iterator PC = FuncInst->getInstrs().begin();
+    assert(PC != nullptr);
+
+    // 与えられたOffsetは関数の先頭からの相対オフセットなので、先頭アドレス分を足す
+    Offset += PC->getOffset();
+
+    uint32_t PCOfs = 0;
+    while (PCOfs < Offset) {
+      PCOfs = PC->getOffset();
+      if (PCOfs == Offset) {
+        return PC;
+      }
+      PC++;
+    }
+
+    // ここまで来たらエラー
+    std::cerr << "[WARN] The offset of program_counter.img is incorrect" << std::endl;
+    return Unexpect(ErrCode::Value::Terminated);
+  }
+
+  Expect<AST::InstrView::iterator> restoreProgramCounter(const Runtime::Instance::ModuleInstance* ModInst) {
+    std::ifstream ifs("program_counter.img", std::ios::binary);
+
+    uint32_t FuncIdx, Offset;
+    ifs.read(reinterpret_cast<char *>(&FuncIdx), sizeof(uint32_t));
+    ifs.read(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
+
+    ifs.close();
+
+    auto Res = _restorePC(ModInst, FuncIdx, Offset);
+    return Res;
   }
   
   Expect<std::vector<Runtime::StackManager::Frame>> restoreStackMgrFrame() {
