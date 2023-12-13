@@ -1921,7 +1921,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
         StackMgr.popFrame();
 
         // For WasmEdge
-        Migr.dumpProgramCounter(PC);
+        Migr.dumpProgramCounter(StackMgr.getModule(), PC);
         std::cout << "Success dumpIter" << std::endl;
         Migr.dumpStackMgrFrame(StackMgr);
         std::cout << "Success dumpStackMgrFrame" << std::endl;

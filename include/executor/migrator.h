@@ -431,7 +431,7 @@ public:
     BaseModName = ModInst->getModuleName();
   }
 
-  Expect<void> dumpProgramCounter(AST::InstrView::iterator Iter) {
+  Expect<void> dumpProgramCounter(const Runtime::Instance::ModuleInstance* ModInst, AST::InstrView::iterator Iter) {
     IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
     // assert(IterMigrator);
 
@@ -441,7 +441,15 @@ public:
       return Unexpect(ErrCode::Value::IllegalPath);
     }
 
-    uint32_t Offset = Iter->getOffset();
+    auto Res = ModInst->getFunc(Data.FuncIdx);
+    if (unlikely(!Res)) {
+      return Unexpect(Res);
+    }
+    Runtime::Instance::FunctionInstance* FuncInst = Res.value();
+    AST::InstrView::iterator PCStart = FuncInst->getInstrs().begin();
+
+
+    uint32_t Offset = Iter->getOffset() - PCStart->getOffset();
     ofs.write(reinterpret_cast<char *>(&Data.FuncIdx), sizeof(uint32_t));
     ofs.write(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
 
@@ -549,6 +557,9 @@ public:
     AST::InstrView::iterator PC = FuncInst->getInstrs().begin();
     assert(PC != nullptr);
 
+    // 与えられたOffsetは関数の先頭からの相対オフセットなので、先頭アドレス分を足す
+    Offset += PC->getOffset();
+
     uint32_t PCOfs = 0;
     while (PCOfs < Offset) {
       PCOfs = PC->getOffset();
@@ -558,7 +569,9 @@ public:
       PC++;
     }
 
-    return PC;
+    // ここまで来たらエラー
+    std::cerr << "[WARN] The offset of program_counter.img is incorrect" << std::endl;
+    return Unexpect(ErrCode::Value::Terminated);
   }
 
   Expect<AST::InstrView::iterator> restoreProgramCounter(const Runtime::Instance::ModuleInstance* ModInst) {
