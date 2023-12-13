@@ -549,13 +549,11 @@ public:
     AST::InstrView::iterator PC = FuncInst->getInstrs().begin();
     assert(PC != nullptr);
 
-    while (PCOfs < PC) {
-      uint32_t PCOfs = PC->getOffset();
+    uint32_t PCOfs = 0;
+    while (PCOfs < Offset) {
+      PCOfs = PC->getOffset();
       if (PCOfs == Offset) {
         return PC;
-      }
-      if (PCOfs > Offset) {
-        std::cerr << "PC is "
       }
       PC++;
     }
