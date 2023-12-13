@@ -397,8 +397,6 @@ public:
     fout.open("wamr_addrs.img", std::ios::trunc);
     tsp_addr_fout.open("tsp_addr.img", std::ios::trunc | std::ios::binary);
 
-    // ip_ofs
-    dump("ip_ofs", CurrentIpOfs);
     // sp_ofs
     dump("sp_ofs", CurrentSpOfs);
     // csp_ofs
@@ -414,8 +412,6 @@ public:
     // done flag
     dump("done_flag", 1);
     
-    
-
     fout.close();
     csp_tsp_fout.close();
     tsp_fout.close();
