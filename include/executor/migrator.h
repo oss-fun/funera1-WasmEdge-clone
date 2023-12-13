@@ -439,12 +439,10 @@ public:
     std::ofstream ofs(fname_header + "program_counter.img", std::ios::trunc | std::ios::binary);
 
     // offsetがWAMR仕様(命令と引数が混在)とする
+    uint32_t Offset = Iter->getOffset();
     ofs.write(reinterpret_cast<char *>(&Data.FuncIdx), sizeof(uint32_t));
-    ofs.write(reinterpret_cast<char *>(&));
+    ofs.write(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
 
-    // iterStream << Data.FuncIdx << std::endl;
-    // iterStream << Data.Offset;
-      
     ofs.close();
   }
 
