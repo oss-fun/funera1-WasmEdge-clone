@@ -441,8 +441,9 @@ public:
       return Unexpect(ErrCode::Value::IllegalPath);
     }
 
+    uint32_t Offset = Iter->getOffset();
     ofs.write(reinterpret_cast<char *>(&Data.FuncIdx), sizeof(uint32_t));
-    ofs.write(reinterpret_cast<char *>(&Data.Offset), sizeof(uint32_t));
+    ofs.write(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
 
     ofs.close();
     return {};
@@ -533,6 +534,35 @@ public:
     return Iter;
   }
 
+  // 命令と引数が混在したOffsetの復元
+  Expect<AST::InstrView::iterator> _restorePC(const Runtime::Instance::ModuleInstance* ModInst, uint32_t FuncIdx, uint32_t Offset) {
+    assert(ModInst != nullptr);
+    
+    auto Res = ModInst->getFunc(FuncIdx);
+    if (unlikely(!Res)) {
+      // spdlog::error(ErrInfo::InfoAST(ASTNodeAttr::Seg_Element));
+      return Unexpect(Res);
+    }
+    Runtime::Instance::FunctionInstance* FuncInst = Res.value();
+    assert(FuncInst != nullptr);
+
+    AST::InstrView::iterator PC = FuncInst->getInstrs().begin();
+    assert(PC != nullptr);
+
+    while (PCOfs < PC) {
+      uint32_t PCOfs = PC->getOffset();
+      if (PCOfs == Offset) {
+        return PC;
+      }
+      if (PCOfs > Offset) {
+        std::cerr << "PC is "
+      }
+      PC++;
+    }
+
+    return PC;
+  }
+
   Expect<AST::InstrView::iterator> restoreProgramCounter(const Runtime::Instance::ModuleInstance* ModInst) {
     std::ifstream ifs("program_counter.img", std::ios::binary);
 
@@ -542,7 +572,7 @@ public:
 
     ifs.close();
 
-    auto Res = _restoreIter(ModInst, FuncIdx, Offset);
+    auto Res = _restorePC(ModInst, FuncIdx, Offset);
     return Res;
   }
   
