@@ -441,28 +441,13 @@ public:
       return Unexpect(ErrCode::Value::IllegalPath);
     }
 
-    uint32_t Offset = Iter->getOffset();
     ofs.write(reinterpret_cast<char *>(&Data.FuncIdx), sizeof(uint32_t));
-    ofs.write(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
+    ofs.write(reinterpret_cast<char *>(&Data.Offset), sizeof(uint32_t));
 
     ofs.close();
     return {};
   }
   
-  // void dumpIter(AST::InstrView::iterator Iter, std::string fname_header = "") {
-  //   IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
-  //   // assert(IterMigrator);
-
-  //   struct SourceLoc Data = IterMigrator[Iter];
-  //   std::ofstream iterStream;
-  //   iterStream.open(fname_header + "iter.img", std::ios::trunc);
-
-  //   iterStream << Data.FuncIdx << std::endl;
-  //   iterStream << Data.Offset;
-      
-  //   iterStream.close();
-  // }
-
   void dumpStackMgrFrame(Runtime::StackManager& StackMgr, std::string fname_header = "") {
     std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
     std::ofstream FrameStream;
@@ -543,62 +528,22 @@ public:
     AST::InstrView::iterator Iter = FuncInst->getInstrs().begin();
     assert(Iter != nullptr);
 
-    for (uint32_t I = 0; I < Offset; ++I) {
-      Iter++;
-    }
+    Iter += Offset;
+
     return Iter;
   }
 
-  Expect<AST::InstrView::iterator> restoreIter(const Runtime::Instance::ModuleInstance* ModInst) {
-    std::ifstream iterStream;
-    iterStream.open("iter.img");
-    
-    std::string iterString;
+  Expect<AST::InstrView::iterator> restoreProgramCounter(const Runtime::Instance::ModuleInstance* ModInst) {
+    std::ifstream ifs("program_counter.img", std::ios::binary);
+
     uint32_t FuncIdx, Offset;
-    // FuncIdx
-    getline(iterStream, iterString);
-    try {
-      FuncIdx = static_cast<uint32_t>(std::stoul(iterString));
-    } catch (const std::invalid_argument& e) {
-      std::cout << "\x1b[31m";
-      std::cout << "FuncIdx[" << iterString << "]: invalid argument" << std::endl;
-      std::cout << "\x1b[m";
-      // return Unexpect(ErrCode::Value::UserDefError);
-    } catch (const std::out_of_range& e) {
-      std::cout << "\x1b[31m";
-      std::cout << "FuncIdx[" << iterString << "]: out of range" << std::endl;
-      std::cout << "\x1b[m";
-      // return Unexpect(e);        // Data = convertIterForWamr(f.From);
-        // const AST::Instruction &Instr = *(f.From);
-    }
-    // Offset
-    getline(iterStream, iterString);
-    try {
-      Offset = static_cast<uint32_t>(std::stoul(iterString));
-    } catch (const std::invalid_argument& e) {
-      std::cout << "\x1b[31m";
-      std::cout << "Offset[" << iterString << "]: invalid argument" << std::endl;
-      std::cout << "\x1b[m";
-      // return Unexpect(e);
-    } catch (const std::out_of_range& e) {
-      std::cout << "\x1b[31m";
-      std::cout << "Offset[" << iterString << "]: out of range" << std::endl;
-      std::cout << "\x1b[m";
-      // return Unexpect(e);
-    }
+    ifs.read(reinterpret_cast<char *>(&FuncIdx), sizeof(uint32_t));
+    ifs.read(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
 
-    iterStream.close();
+    ifs.close();
 
-    // std::cout << FuncIdx << " " << Offset << std::endl;
-    
-    // FuncIdxとOffsetからitertorを復元
     auto Res = _restoreIter(ModInst, FuncIdx, Offset);
-    if (!Res) {
-      return Unexpect(Res);
-    }
-
-    auto Iter = Res.value();
-    return Iter;
+    return Res;
   }
   
   Expect<std::vector<Runtime::StackManager::Frame>> restoreStackMgrFrame() {

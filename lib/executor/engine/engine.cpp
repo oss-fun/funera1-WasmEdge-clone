@@ -70,7 +70,7 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
     // Restore
     if (RestoreFlag && Conf.getStatisticsConfigure().getRestoreFlag()) {
       // std::cout << "### Restore! ###" << std::endl;
-      auto Res = Migr.restoreIter(Func.getModule());
+      auto Res = Migr.restoreProgramCounter(Func.getModule());
       if (!Res) {
         return Unexpect(Res);
       }
