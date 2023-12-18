@@ -125,6 +125,18 @@ public:
     }
     return ret;
   }
+
+  // 命令アドレスの状態表現 (fidx, offset)
+  std::pair<uint32_t, uint32_t> getInstrAddrExpr(const Runtime::Instance::ModuleInstance *ModInst, AST::InstrView::iterator it) {
+      IterMigratorType iterMigr = getIterMigratorByName(BaseModName);
+      struct SourceLoc Data = iterMigr[it];
+      auto Res = ModInst->getFunc(Data.FuncIdx);
+      Runtime::Instance::FunctionInstance* FuncInst = Res.value();
+      AST::InstrView::iterator PCStart = FuncInst->getInstrs().begin();
+      uint32_t Offset = it->getOffset() - PCStart->getOffset();
+
+      return std::make_pair(Data.FuncIdx, Offset);
+  }
   
   // void debugFuncOpcode(uint32_t FuncIdx, uint32_t Offset, AST::InstrView::iterator it) {
   //   std::ofstream opcodeLog;
@@ -504,6 +516,7 @@ public:
     std::ofstream ofs("frame_stack.img", std::ios::trunc | std::ios::binary);
 
     std::map<std::string_view, bool> seenModInst;
+    uint32_t PreTspOfs = 0;
     for (size_t I = 0; I < FrameStack.size(); ++I) {
       Runtime::StackManager::Frame f = FrameStack[I];
 
@@ -515,6 +528,27 @@ public:
         std::cerr << "ModInst is nullptr" << std::endl;
         exit(1);
       }
+
+      // リターンアドレス(uint32 fidx, uint32 offset)
+      auto [FuncIdx, Offset] = getInstrAddrExpr(ModInst, f.From);
+      ofs.write(reinterpret_cast<char *>(&FuncIdx), sizeof(uint32_t));
+      ofs.write(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
+
+      // 型スタック
+      std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
+      uint32_t TspOfs = (f.VPos - f.Locals) - PreTspOfs;
+      ofs.write(reinterpret_cast<char *>(&TspOfs), sizeof(uint32_t));
+      for (uint32_t I = PreTspOfs+1; I <= TspOfs; I++) {
+        ofs.write(reinterpret_cast<char *>(&TypeStack[I]), sizeof(uint8_t));
+      }
+
+      // 値スタック
+      std::vector<ValVariant> ValueStack = StackMgr.getValueStack();
+      for (uint32_t I = PreTspOfs+1; I <= TspOfs; I++) {
+        ofs.write(reinterpret_cast<char *>(&ValueStack[I].get<uint128_t>()), sizeof(uint32_t) * TypeStack[I]);
+      }
+
+      // ラベルスタック
     }
   }
   
