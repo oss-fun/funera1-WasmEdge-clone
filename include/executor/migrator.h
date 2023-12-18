@@ -157,9 +157,9 @@ public:
       exit(1);
     }
 
-    std::cout << "[DEBUG]TypeStack: [";
-    for (size_t I = 0; I < Vals.size(); ++I) std::cout << +Typs[I];
-    std::cout << "]" << std::endl;
+    // std::cout << "[DEBUG]TypeStack: [";
+    // for (size_t I = 0; I < Vals.size(); ++I) std::cout << +Typs[I];
+    // std::cout << "]" << std::endl;
 
     for (size_t I = 0; I < Vals.size(); ++I) {
       Value v = Vals[I];
@@ -498,10 +498,29 @@ public:
     
     FrameStream.close();
   }
+
+  void dumpFrameStack(Runtime::StackManager& StackMgr) {
+    std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
+    std::ofstream ofs("frame_stack.img", std::ios::trunc | std::ios::binary);
+
+    std::map<std::string_view, bool> seenModInst;
+    for (size_t I = 0; I < FrameStack.size(); ++I) {
+      Runtime::StackManager::Frame f = FrameStack[I];
+
+      // ModuleInstance
+      const Runtime::Instance::ModuleInstance* ModInst = f.Module;
+
+      // ModInstがnullの場合、ModNameだけ出力してcontinue
+      if (ModInst == nullptr) {
+        std::cerr << "ModInst is nullptr" << std::endl;
+        exit(1);
+      }
+    }
+  }
   
   void dumpStackMgrValue(Runtime::StackManager& StackMgr, std::string fname_header = "") {
     std::ofstream ValueStream;
-    ValueStream.open(fname_header + "stackmgr_value.img", std::ios::trunc);
+    ValueStream.open(fname_header + "value_stack.img", std::ios::trunc);
 
     using Value = ValVariant;
     std::vector<Value> ValueStack = StackMgr.getValueStack();
@@ -659,7 +678,7 @@ public:
   
   Expect<std::vector<Runtime::StackManager::Value>> restoreStackMgrValue() {	  // Runtime::StackManager restoreStackMgr() {
     std::ifstream ValueStream;	  // }
-    ValueStream.open("stackmgr_value.img");	
+    ValueStream.open("value_stack.img");	
     Runtime::StackManager StackMgr;	
 
     std::vector<Runtime::StackManager::Value> ValueStack;	
