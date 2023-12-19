@@ -778,14 +778,33 @@ public:
 
     std::cerr << "frame stack size is " << StackMgr.getFrameStack().size() << std::endl;
 
-    for (size_t I = 1; I < LenFrame; I++) {
+    for (size_t I = 2; I < LenFrame; I++) {
       ifs.open("stack" + std::to_string(I) + ".img", std::ios::binary);
+
+      // 関数インデックス
+      uint32_t EnterFuncIdx;
+      ifs.read(reinterpret_cast<char *>(&EnterFuncIdx), sizeof(uint32_t));
+      auto Res = Module->getFunc(EnterFuncIdx);
+      if (!Res) {
+        return Unexpect(Res);
+      }
+      // ローカルと返り値の数
+      const Runtime::Instance::FunctionInstance* Func = Res.value();
+      const auto &FuncType = Func->getFuncType();
+      const uint32_t ArgsN = static_cast<uint32_t>(FuncType.getParamTypes().size());
+      const uint32_t RetsN =
+          static_cast<uint32_t>(FuncType.getReturnTypes().size());
+      
 
       // リターンアドレス
       uint32_t FuncIdx, Offset;
       ifs.read(reinterpret_cast<char *>(&FuncIdx), sizeof(uint32_t));
       ifs.read(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
-      auto From = _restorePC(Module, FuncIdx, Offset);
+      auto Res2 =_restorePC(Module, FuncIdx, Offset);
+      if (!Res2) {
+        return Unexpect(Res2);
+      }
+      AST::InstrView::iterator From = Res2.value();
 
       // 型スタック
       uint32_t TspOfs;
@@ -801,11 +820,11 @@ public:
       for (uint32_t I = 0; I < TspOfs; I++) {
         ValVariant value;
         ifs.read(reinterpret_cast<char *>(&value), sizeof(uint32_t) * TypeStack[TspBase + I]);
-        StackMgr.push(value);
+        StackMgr.push(value, TypeStack[I]);
       }
 
-      // TODO: ローカルと返り値がいる
-      // TODO: 型スタックをStackMgrに戻す
+      // TODO: Localsに対応する値をenterFunctionと対応してるか確認する
+      StackMgr.pushFrameExt(Module, From, Func, ArgsN, RetsN);
     }
     return {};
   }
