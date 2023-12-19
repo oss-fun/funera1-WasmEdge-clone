@@ -153,7 +153,7 @@ public:
   /// ================
   /// Dump functions for WAMR
   /// ================
-  void dumpStack(Runtime::StackManager& StackMgr) {
+  void dumpStackWamr(Runtime::StackManager& StackMgr) {
     std::ofstream fout;
     // fout.open("wamr_stack.img", std::ios::out | std::ios::binary | std::ios::trunc);
     fout.open("wamr_stack.img", std::ios::out | std::ios::trunc);
@@ -252,7 +252,6 @@ public:
 
       PC++;
     }
-    
     return CtrlStack;
   }
   
@@ -511,7 +510,7 @@ public:
     FrameStream.close();
   }
 
-  void dumpFrameStack(Runtime::StackManager& StackMgr) {
+  void dumpStack(Runtime::StackManager& StackMgr) {
     std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
     std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
     std::ofstream csp_tsp_fout("ctrl_tsp.img", std::ios::trunc | std::ios::binary);
@@ -525,7 +524,7 @@ public:
 
     std::map<std::string_view, bool> seenModInst;
     uint32_t PreTspOfs = 0;
-    for (size_t I = 0; I < FrameStack.size(); ++I) {
+    for (size_t I = 1; I < FrameStack.size(); ++I) {
       std::ofstream ofs("frame_stack" + std::to_string(I) + ".img", std::ios::trunc | std::ios::binary);
       Runtime::StackManager::Frame f = FrameStack[I];
 
@@ -564,8 +563,9 @@ public:
       }
       Runtime::Instance::FunctionInstance* FuncInst = Res.value();
       std::vector<struct CtrlInfo> CtrlStack = getCtrlStack(f.From, FuncInst, WamrCellSums);
-      ofs.write(reinterpret_cast<char *>(&(CtrlStack.size())), sizeof(uint32_t));
-      for (uint32_t I = 0; I < CtrlStack.size(); I++) {
+      uint32_t LenCs = CtrlStack.size();
+      ofs.write(reinterpret_cast<char *>(&LenCs), sizeof(uint32_t));
+      for (uint32_t I = 0; I < LenCs; I++) {
         struct CtrlInfo ci = CtrlStack[I];
         ofs.write(reinterpret_cast<char *>(&ci.BeginAddrOfs), sizeof(uint32_t));
         ofs.write(reinterpret_cast<char *>(&ci.TargetAddrOfs), sizeof(uint32_t));
@@ -739,6 +739,10 @@ public:
     FrameStream.close();
     return FrameStack;
   }
+
+  // Expect<void> restoreStack(Runtime::StackManager& StackMgr) {
+    
+  // }
   
   Expect<std::vector<Runtime::StackManager::Value>> restoreStackMgrValue() {	  // Runtime::StackManager restoreStackMgr() {
     std::ifstream ValueStream;	  // }

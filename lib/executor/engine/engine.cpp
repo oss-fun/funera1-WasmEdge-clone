@@ -1912,7 +1912,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
         // For WAMR
         // Migr.dumpMemory(StackMgr.getModule());
         // std::cout << "Success dumpMemory for WAMR" << std::endl;
-        Migr.dumpStack(StackMgr);
+        Migr.dumpStackWamr(StackMgr);
         std::cout << "Success dumpStack for WAMR" << std::endl;
 
         StackMgr.pushFrame(StackMgr.getModule(), PC, 0, 0, false);
@@ -1923,10 +1923,13 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
         // For WasmEdge
         Migr.dumpProgramCounter(StackMgr.getModule(), PC);
         std::cout << "Success dumpIter" << std::endl;
-        Migr.dumpStackMgrFrame(StackMgr);
-        std::cout << "Success dumpStackMgrFrame" << std::endl;
-        Migr.dumpStackMgrValue(StackMgr);
-        std::cout << "Success dumpStackMgrValue" << std::endl;
+
+        Migr.dumpStack(StackMgr);
+        std::cout << "Success dumpStack" << std::endl;
+        // Migr.dumpStackMgrFrame(StackMgr);
+        // std::cout << "Success dumpStackMgrFrame" << std::endl;
+        // Migr.dumpStackMgrValue(StackMgr);
+        // std::cout << "Success dumpStackMgrValue" << std::endl;
       }
       return {};
     }
