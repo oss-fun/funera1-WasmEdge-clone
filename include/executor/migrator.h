@@ -137,6 +137,11 @@ public:
 
       return std::make_pair(Data.FuncIdx, Offset);
   }
+
+  // FunctioninstanceからFuncIdxを取得する
+  uint32_t getFuncIdx(const Runtime::Instance::FunctionInstance* Func) {
+    if (Func == nullptr) return -1;
+  }
   
   // void debugFuncOpcode(uint32_t FuncIdx, uint32_t Offset, AST::InstrView::iterator it) {
   //   std::ofstream opcodeLog;
@@ -543,6 +548,10 @@ public:
         exit(1);
       }
 
+      // 関数インデックス
+      uint32_t EnterFuncIdx = getFuncIdx(f.EnterFunc);
+      ofs.write(reinterpret_cast<char *>(&EnterFuncIdx), sizeof(uint32_t));
+
       // リターンアドレス(uint32 fidx, uint32 offset)
       auto [FuncIdx, Offset] = getInstrAddrExpr(ModInst, f.From);
       ofs.write(reinterpret_cast<char *>(&FuncIdx), sizeof(uint32_t));
@@ -551,35 +560,14 @@ public:
       // 型スタック
       uint32_t TspOfs = (f.VPos - f.Locals) - PreTspOfs;
       ofs.write(reinterpret_cast<char *>(&TspOfs), sizeof(uint32_t));
-      uint8_t t;
       for (uint32_t I = PreTspOfs+1; I <= TspOfs; I++) {
-        if (TypeStack[I] == 0) {
-          t = 1;
-          ofs.write(reinterpret_cast<char *>(&t), sizeof(uint8_t));
-        }
-        else if (TypeStack[I] == 1) {
-          t = 2;
-          ofs.write(reinterpret_cast<char *>(&t), sizeof(uint8_t));
-        }
-        else if (TypeStack[I] == 2) {
-          t = 4;
-          ofs.write(reinterpret_cast<char *>(&t), sizeof(uint8_t));
-        }
-        else
-          exit(1);
+          ofs.write(reinterpret_cast<char *>(&TypeStack[I]), sizeof(uint8_t));
       }
 
       // 値スタック
       std::vector<ValVariant> ValueStack = StackMgr.getValueStack();
       for (uint32_t I = PreTspOfs+1; I <= TspOfs; I++) {
-        if (TypeStack[I] == 0)
-          ofs.write(reinterpret_cast<char *>(&ValueStack[I].get<uint128_t>()), sizeof(uint32_t));
-        else if (TypeStack[I] == 1)
-          ofs.write(reinterpret_cast<char *>(&ValueStack[I].get<uint128_t>()), sizeof(uint64_t));
-        else if (TypeStack[I] == 2)
-          ofs.write(reinterpret_cast<char *>(&ValueStack[I].get<uint128_t>()), sizeof(uint128_t));
-        else
-          exit(1);
+        ofs.write(reinterpret_cast<char *>(&ValueStack[I].get<uint128_t>()), sizeof(uint32_t) * TypeStack[I]);
       }
 
       // ラベルスタック
