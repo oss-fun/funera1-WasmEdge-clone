@@ -83,15 +83,7 @@ public:
     ValueStack.push_back(std::forward<T>(Val));
     // 32bitなら0, 64bitなら1
     size_t t = sizeof(T);
-    if (t == 4) {
-      TypeStack.push_back((uint8_t)0);
-    }
-    else if (t == 8) {
-      TypeStack.push_back((uint8_t)1);
-    }
-    else {
-      TypeStack.push_back(std::forward<uint8_t>(2));
-    }
+    TypeStack.push_back(std::forward<uint8_t>(t/4));
     // std::cout << "[DEBUG]push stack: type kind: " << +TypeStack.back() << ", Pos: " << ValueStack.size() << " " << TypeStack.size() << std::endl;
   }
 
