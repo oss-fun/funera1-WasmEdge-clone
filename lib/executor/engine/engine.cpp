@@ -76,14 +76,9 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
       }
 
       StartIt = Res.value();
-      StackMgr = Migr.restoreStackMgr().value();
+      Migr.restoreStack(StackMgr);
+      // StackMgr = Migr.restoreStackMgr().value();
       
-      /// restoreしたものが元のものと一致するかtest
-      // Migr.dumpIter(StartIt, "restored_");
-      // Migr.dumpStackMgrFrame(StackMgr, "restored_");
-      // Migr.dumpStackMgrValue(StackMgr, "restored_");
-      // std::cout << "Success to dump restore file" << std::endl;
-
       RestoreFlag = false;
     }
   
@@ -1915,6 +1910,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
         Migr.dumpStackWamr(StackMgr);
         std::cout << "Success dumpStack for WAMR" << std::endl;
 
+        // TODO: pushFrameExtで関数インスタンスの値が必要
         StackMgr.pushFrame(StackMgr.getModule(), PC, 0, 0, false);
         Migr.dumpFrame(StackMgr);
         std::cout << "Success dumpFrame for WAMR" << std::endl;

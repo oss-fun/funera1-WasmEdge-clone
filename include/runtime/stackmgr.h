@@ -28,9 +28,13 @@ public:
     Frame() = delete;
     Frame(const Instance::ModuleInstance *Mod, AST::InstrView::iterator FromIt,
           uint32_t L, uint32_t A, uint32_t V) noexcept
-        : Module(Mod), From(FromIt), Locals(L), Arity(A), VPos(V) {}
+        : Module(Mod), From(FromIt), EnterFunc(nullptr), Locals(L), Arity(A), VPos(V) {}
+    Frame(const Instance::ModuleInstance *Mod, AST::InstrView::iterator FromIt, const Instance::FunctionInstance *Func,
+          uint32_t L, uint32_t A, uint32_t V) noexcept
+        : Module(Mod), From(FromIt), EnterFunc(Func), Locals(L), Arity(A), VPos(V) {}
     const Instance::ModuleInstance *Module;
     AST::InstrView::iterator From;
+    const Runtime::Instance::FunctionInstance *EnterFunc;
     uint32_t Locals;
     uint32_t Arity;
     uint32_t VPos;
@@ -109,7 +113,7 @@ public:
                  AST::InstrView::iterator From, uint32_t LocalNum = 0,
                  uint32_t Arity = 0, bool IsTailCall = false) noexcept {
     if (likely(!IsTailCall)) {
-      FrameStack.emplace_back(Module, From, LocalNum, Arity, ValueStack.size());
+      FrameStack.emplace_back(Module, From, nullptr, LocalNum, Arity, ValueStack.size());
     } else {
       assuming(!FrameStack.empty());
       assuming(FrameStack.back().VPos >= FrameStack.back().Locals);
@@ -124,9 +128,17 @@ public:
 
       FrameStack.back().Module = Module;
       FrameStack.back().Locals = LocalNum;
+      FrameStack.back().EnterFunc = nullptr;
       FrameStack.back().Arity = Arity;
       FrameStack.back().VPos = static_cast<uint32_t>(ValueStack.size());
     }
+  }
+
+  void pushFrameExt(const Instance::ModuleInstance *Module,
+                 AST::InstrView::iterator From, const Runtime::Instance::FunctionInstance *EnterFunc, 
+                 uint32_t LocalNum = 0, uint32_t Arity = 0, bool IsTailCall = false) noexcept {
+    pushFrame(Module, From, LocalNum, Arity, IsTailCall);
+    FrameStack.back().EnterFunc = EnterFunc;
   }
 
   /// Unsafe pop top frame.

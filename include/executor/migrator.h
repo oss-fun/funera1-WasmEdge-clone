@@ -514,6 +514,12 @@ public:
     std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
     std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
     std::ofstream csp_tsp_fout("ctrl_tsp.img", std::ios::trunc | std::ios::binary);
+    std::ofstream frame_fout("frame.img", std::ios::trunc | std::ios::binary);
+
+    // header file. frame stackのサイズを記録
+    uint32_t LenFrame = FrameStack.size();
+    frame_fout.write(reinterpret_cast<char *>(&LenFrame), sizeof(uint32_t));
+    frame_fout.close();
     
     // TypeStackからWAMRのセルの個数累積和みたいにする
     // 累積和 1-indexed
@@ -524,8 +530,8 @@ public:
 
     std::map<std::string_view, bool> seenModInst;
     uint32_t PreTspOfs = 0;
-    for (size_t I = 1; I < FrameStack.size(); ++I) {
-      std::ofstream ofs("frame_stack" + std::to_string(I) + ".img", std::ios::trunc | std::ios::binary);
+    for (size_t I = 1; I < LenFrame; ++I) {
+      std::ofstream ofs("stack" + std::to_string(I) + ".img", std::ios::trunc | std::ios::binary);
       Runtime::StackManager::Frame f = FrameStack[I];
 
       // ModuleInstance
@@ -545,14 +551,35 @@ public:
       // 型スタック
       uint32_t TspOfs = (f.VPos - f.Locals) - PreTspOfs;
       ofs.write(reinterpret_cast<char *>(&TspOfs), sizeof(uint32_t));
+      uint8_t t;
       for (uint32_t I = PreTspOfs+1; I <= TspOfs; I++) {
-        ofs.write(reinterpret_cast<char *>(&TypeStack[I]), sizeof(uint8_t));
+        if (TypeStack[I] == 0) {
+          t = 1;
+          ofs.write(reinterpret_cast<char *>(&t), sizeof(uint8_t));
+        }
+        else if (TypeStack[I] == 1) {
+          t = 2;
+          ofs.write(reinterpret_cast<char *>(&t), sizeof(uint8_t));
+        }
+        else if (TypeStack[I] == 2) {
+          t = 4;
+          ofs.write(reinterpret_cast<char *>(&t), sizeof(uint8_t));
+        }
+        else
+          exit(1);
       }
 
       // 値スタック
       std::vector<ValVariant> ValueStack = StackMgr.getValueStack();
       for (uint32_t I = PreTspOfs+1; I <= TspOfs; I++) {
-        ofs.write(reinterpret_cast<char *>(&ValueStack[I].get<uint128_t>()), sizeof(uint32_t) * TypeStack[I]);
+        if (TypeStack[I] == 0)
+          ofs.write(reinterpret_cast<char *>(&ValueStack[I].get<uint128_t>()), sizeof(uint32_t));
+        else if (TypeStack[I] == 1)
+          ofs.write(reinterpret_cast<char *>(&ValueStack[I].get<uint128_t>()), sizeof(uint64_t));
+        else if (TypeStack[I] == 2)
+          ofs.write(reinterpret_cast<char *>(&ValueStack[I].get<uint128_t>()), sizeof(uint128_t));
+        else
+          exit(1);
       }
 
       // ラベルスタック
@@ -740,9 +767,48 @@ public:
     return FrameStack;
   }
 
-  // Expect<void> restoreStack(Runtime::StackManager& StackMgr) {
-    
-  // }
+  Expect<void> restoreStack(Runtime::StackManager& StackMgr) {
+    std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
+    const Runtime::Instance::ModuleInstance *Module = StackMgr.getModule();
+
+    uint32_t LenFrame;
+    std::ifstream ifs("frame.img", std::ios::binary);
+    ifs.read(reinterpret_cast<char *>(&LenFrame), sizeof(uint32_t));
+    ifs.close();
+
+    std::cerr << "frame stack size is " << StackMgr.getFrameStack().size() << std::endl;
+
+    for (size_t I = 1; I < LenFrame; I++) {
+      ifs.open("stack" + std::to_string(I) + ".img", std::ios::binary);
+
+      // リターンアドレス
+      uint32_t FuncIdx, Offset;
+      ifs.read(reinterpret_cast<char *>(&FuncIdx), sizeof(uint32_t));
+      ifs.read(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
+      auto From = _restorePC(Module, FuncIdx, Offset);
+
+      // 型スタック
+      uint32_t TspOfs;
+      uint32_t TspBase = TypeStack.size();
+      ifs.read(reinterpret_cast<char *>(&TspOfs), sizeof(uint32_t));
+      for (uint32_t I = 0; I < TspOfs; I++) {
+        uint8_t type;
+        ifs.read(reinterpret_cast<char *>(&type), sizeof(uint8_t));
+        TypeStack.push_back(type);
+      }
+
+      // 値スタック
+      for (uint32_t I = 0; I < TspOfs; I++) {
+        ValVariant value;
+        ifs.read(reinterpret_cast<char *>(&value), sizeof(uint32_t) * TypeStack[TspBase + I]);
+        StackMgr.push(value);
+      }
+
+      // TODO: ローカルと返り値がいる
+      // TODO: 型スタックをStackMgrに戻す
+    }
+    return {};
+  }
   
   Expect<std::vector<Runtime::StackManager::Value>> restoreStackMgrValue() {	  // Runtime::StackManager restoreStackMgr() {
     std::ifstream ValueStream;	  // }
