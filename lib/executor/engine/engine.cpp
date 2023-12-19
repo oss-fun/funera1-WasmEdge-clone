@@ -74,10 +74,15 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
       if (!Res) {
         return Unexpect(Res);
       }
-
       StartIt = Res.value();
+      std::cerr << "restore pc" << std::endl;
+
       Migr.restoreStack(StackMgr);
-      // StackMgr = Migr.restoreStackMgr().value();
+      std::cerr << "restore stack" << std::endl;
+      Migr.restoreMemory(StackMgr.getModule());
+      std::cerr << "restore memory" << std::endl;
+      Migr.restoreGlobal(StackMgr.getModule());
+      std::cerr << "restore global" << std::endl;
       
       RestoreFlag = false;
     }
@@ -1917,6 +1922,8 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
         StackMgr.popFrame();
 
         // For WasmEdge
+        Migr.dumpMemory(StackMgr.getModule());
+        Migr.dumpGlobal(StackMgr.getModule());
         Migr.dumpProgramCounter(StackMgr.getModule(), PC);
         std::cout << "Success dumpIter" << std::endl;
 
