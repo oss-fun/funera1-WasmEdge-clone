@@ -513,11 +513,20 @@ public:
 
   void dumpFrameStack(Runtime::StackManager& StackMgr) {
     std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
-    std::ofstream ofs("frame_stack.img", std::ios::trunc | std::ios::binary);
+    std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
+    std::ofstream csp_tsp_fout("ctrl_tsp.img", std::ios::trunc | std::ios::binary);
+    
+    // TypeStackからWAMRのセルの個数累積和みたいにする
+    // 累積和 1-indexed
+    std::vector<uint32_t> WamrCellSums(TypeStack.size()+1, 0);
+    for (uint32_t I = 0; I < TypeStack.size(); I++) {
+        WamrCellSums[I+1] = WamrCellSums[I] + (TypeStack[I] == 0 ? 1 : 2);
+    }
 
     std::map<std::string_view, bool> seenModInst;
     uint32_t PreTspOfs = 0;
     for (size_t I = 0; I < FrameStack.size(); ++I) {
+      std::ofstream ofs("frame_stack" + std::to_string(I) + ".img", std::ios::trunc | std::ios::binary);
       Runtime::StackManager::Frame f = FrameStack[I];
 
       // ModuleInstance
@@ -535,7 +544,6 @@ public:
       ofs.write(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
 
       // 型スタック
-      std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
       uint32_t TspOfs = (f.VPos - f.Locals) - PreTspOfs;
       ofs.write(reinterpret_cast<char *>(&TspOfs), sizeof(uint32_t));
       for (uint32_t I = PreTspOfs+1; I <= TspOfs; I++) {
@@ -549,7 +557,29 @@ public:
       }
 
       // ラベルスタック
+      auto Res = ModInst->getFunc(FuncIdx);
+      if (!Res) {
+        std::cerr << "FuncIdx isn't correct" << std::endl; 
+        exit(1);
+      }
+      Runtime::Instance::FunctionInstance* FuncInst = Res.value();
+      std::vector<struct CtrlInfo> CtrlStack = getCtrlStack(f.From, FuncInst, WamrCellSums);
+      ofs.write(reinterpret_cast<char *>(&(CtrlStack.size())), sizeof(uint32_t));
+      for (uint32_t I = 0; I < CtrlStack.size(); I++) {
+        struct CtrlInfo ci = CtrlStack[I];
+        ofs.write(reinterpret_cast<char *>(&ci.BeginAddrOfs), sizeof(uint32_t));
+        ofs.write(reinterpret_cast<char *>(&ci.TargetAddrOfs), sizeof(uint32_t));
+        ofs.write(reinterpret_cast<char *>(&ci.SpOfs), sizeof(uint32_t));
+        ofs.write(reinterpret_cast<char *>(&ci.ResultCells), sizeof(uint32_t));
+
+        // TODO: ofsに統合
+        csp_tsp_fout.write(reinterpret_cast<char *>(&ci.TspOfs), sizeof(uint32_t));
+        csp_tsp_fout.write(reinterpret_cast<char *>(&ci.ResultCount), sizeof(uint32_t));
+      }
+
+      ofs.close();
     }
+    csp_tsp_fout.close();
   }
   
   void dumpStackMgrValue(Runtime::StackManager& StackMgr, std::string fname_header = "") {
