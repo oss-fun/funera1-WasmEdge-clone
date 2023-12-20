@@ -499,7 +499,7 @@ public:
     }
 
     std::map<std::string_view, bool> seenModInst;
-    uint32_t PreStackTop = 0;
+    uint32_t PreStackTop = FrameStack[0].VPos - FrameStack[0].Locals;
     for (size_t I = 1; I < LenFrame; ++I) {
       std::ofstream ofs("stack" + std::to_string(I) + ".img", std::ios::trunc | std::ios::binary);
       Runtime::StackManager::Frame f = FrameStack[I];
@@ -559,6 +559,14 @@ public:
       }
 
       ofs.close();
+
+      std::string DebugPrefix = "[DEBUG]";
+      std::cerr << DebugPrefix << "Frame Idx: " << I << std::endl;
+      std::cerr << DebugPrefix << "EnterFuncIdx: " << EnterFuncIdx << std::endl;
+      std::cerr << DebugPrefix << "Locals: " << f.Locals << std::endl;
+      std::cerr << DebugPrefix << "Arity: "  << f.Arity << std::endl;
+      std::cerr << DebugPrefix << "VPos: "   << f.VPos << std::endl;
+      std::cerr << std::endl;
     }
     csp_tsp_fout.close();
   }
@@ -751,15 +759,24 @@ public:
 
       // 値スタック
       for (uint32_t I = 0; I < TspOfs; I++) {
-        ValVariant value;
-        ifs.read(reinterpret_cast<char *>(&value), sizeof(uint32_t) * TypeStack[I]);
-        StackMgr.push(value, TypeStack[I]);
+        ValVariant Value;
+        ifs.read(reinterpret_cast<char *>(&Value), sizeof(uint32_t) * TypeStack[I]);
+        StackMgr.push(Value, TypeStack[I]);
       }
 
       // TODO: Localsに対応する値をenterFunctionと対応してるか確認する
       uint32_t Locals = ArgsN + Func->getLocalNum();
       uint32_t VPos = StackMgr.getValueStack().size() + Locals;
       StackMgr._pushFrame(Module, From, Func, ArgsN + Func->getLocalNum(), RetsN, VPos, false);
+
+      // debug
+      std::string DebugPrefix = "[DEBUG]";
+      std::cerr << DebugPrefix << "Frame Idx: " << I << std::endl;
+      std::cerr << DebugPrefix << "EnterFuncIdx: " << EnterFuncIdx << std::endl;
+      std::cerr << DebugPrefix << "Locals: " << ArgsN+Func->getLocalNum() << std::endl;
+      std::cerr << DebugPrefix << "Arity: "  << RetsN << std::endl;
+      std::cerr << DebugPrefix << "VPos: "   << VPos << std::endl;
+      std::cerr << std::endl;
     }
     return {};
   }
