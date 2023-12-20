@@ -724,30 +724,14 @@ public:
     for (size_t I = 2; I < LenFrame; I++) {
       ifs.open("stack" + std::to_string(I) + ".img", std::ios::binary);
 
-      // 関数インデックス
+      // 関数インデックスのロード
       uint32_t EnterFuncIdx;
       ifs.read(reinterpret_cast<char *>(&EnterFuncIdx), sizeof(uint32_t));
-      auto Res = Module->getFunc(EnterFuncIdx);
-      if (!Res) {
-        return Unexpect(Res);
-      }
-      // ローカルと返り値の数
-      const Runtime::Instance::FunctionInstance* Func = Res.value();
-      const auto &FuncType = Func->getFuncType();
-      const uint32_t ArgsN = static_cast<uint32_t>(FuncType.getParamTypes().size());
-      const uint32_t RetsN =
-          static_cast<uint32_t>(FuncType.getReturnTypes().size());
       
-
-      // リターンアドレス
+      // リターンアドレスのロード
       uint32_t FuncIdx, Offset;
       ifs.read(reinterpret_cast<char *>(&FuncIdx), sizeof(uint32_t));
       ifs.read(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
-      auto Res2 =_restorePC(Module, FuncIdx, Offset);
-      if (!Res2) {
-        return Unexpect(Res2);
-      }
-      AST::InstrView::iterator From = Res2.value();
 
       // 型スタック
       uint32_t TspOfs;
@@ -766,12 +750,33 @@ public:
         StackMgr.push(Value, TypeStack[I]);
       }
 
+      // 最後のフレームは元のWasmEdgeフレームスタックには入ってないもの
+      // 値スタックと型スタックのみ復元する
+      if (I == LenFrame-1) break;
+
+      // リターンアドレスの復元
+      auto ResFrom = _restorePC(Module, FuncIdx, Offset);
+      if (!ResFrom) {
+        return Unexpect(ResFrom);
+      }
+      AST::InstrView::iterator From = ResFrom.value();
+
+      // ローカルと返り値の数
+      auto ResFunc = Module->getFunc(EnterFuncIdx);
+      if (!ResFunc) {
+        return Unexpect(ResFunc);
+      }
+      const Runtime::Instance::FunctionInstance* Func = ResFunc.value();
+      const auto &FuncType = Func->getFuncType();
+      const uint32_t ArgsN = static_cast<uint32_t>(FuncType.getParamTypes().size());
+      const uint32_t RetsN =
+          static_cast<uint32_t>(FuncType.getReturnTypes().size());
+
       // TODO: Localsに対応する値をenterFunctionと対応してるか確認する
       uint32_t Locals = ArgsN + Func->getLocalNum();
       uint32_t VPos = StackMgr.getValueStack().size() + Locals;
-                      // + (Func->isWasmFunction() ? Locals : 0); // Localsを足すのはWasmFunctionのときのみ(enterFunction()より)
-      StackMgr._pushFrame(Module, From, Func, ArgsN + Func->getLocalNum(), RetsN, VPos, false);
 
+      StackMgr._pushFrame(Module, From, Func, ArgsN + Func->getLocalNum(), RetsN, VPos, false);
       ifs.close();
 
       // debug

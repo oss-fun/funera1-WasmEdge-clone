@@ -1874,14 +1874,12 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
   // signal handler
   signal(SIGINT, &signalHandler);
 
-  // int cnt = 0;
   // int dispatch_count = 0;
-  // int dispatch_limit = -1;
+  // int dispatch_limit = 1000;
 
   while (PC != PCEnd) {
     // dispatch_count++;
-    // if (dispatch_count == dispatch_limit)
-    //   DumpFlag = true;
+    // if (dispatch_count == dispatch_limit) DumpFlag = true;
       
 
     if (Stat) {
@@ -1938,12 +1936,10 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
         Migr.dumpProgramCounter(StackMgr.getModule(), PC);
         std::cout << "Success dumpIter" << std::endl;
 
+        StackMgr.pushFrame(StackMgr.getModule(), PC, 0, 0, false);
         Migr.dumpStack(StackMgr);
+        StackMgr.popFrame();
         std::cout << "Success dumpStack" << std::endl;
-        // Migr.dumpStackMgrFrame(StackMgr);
-        // std::cout << "Success dumpStackMgrFrame" << std::endl;
-        // Migr.dumpStackMgrValue(StackMgr);
-        // std::cout << "Success dumpStackMgrValue" << std::endl;
       }
       return {};
     }
@@ -1959,7 +1955,6 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     }
     
     PC++;
-    // cnt++;
   }
   return {};
 }

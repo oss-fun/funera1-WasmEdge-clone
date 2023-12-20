@@ -26,15 +26,12 @@ class StackManager {
 public:
   struct Frame {
     Frame() = delete;
-    Frame(const Instance::ModuleInstance *Mod, AST::InstrView::iterator FromIt,
-          uint32_t L, uint32_t A, uint32_t V) noexcept
-        : Module(Mod), From(FromIt), EnterFunc(nullptr), Locals(L), Arity(A), VPos(V) {}
     Frame(const Instance::ModuleInstance *Mod, AST::InstrView::iterator FromIt, const Instance::FunctionInstance *Func,
           uint32_t L, uint32_t A, uint32_t V) noexcept
         : Module(Mod), From(FromIt), EnterFunc(Func), Locals(L), Arity(A), VPos(V) {}
     const Instance::ModuleInstance *Module;
     AST::InstrView::iterator From;
-    const Runtime::Instance::FunctionInstance *EnterFunc;
+    const Instance::FunctionInstance *EnterFunc;
     uint32_t Locals;
     uint32_t Arity;
     uint32_t VPos;
