@@ -560,6 +560,7 @@ public:
 
       ofs.close();
 
+      // debug
       std::string DebugPrefix = "[DEBUG]";
       std::cerr << DebugPrefix << "Frame Idx: " << I << std::endl;
       std::cerr << DebugPrefix << "EnterFuncIdx: " << EnterFuncIdx << std::endl;
@@ -768,6 +769,8 @@ public:
       uint32_t Locals = ArgsN + Func->getLocalNum();
       uint32_t VPos = StackMgr.getValueStack().size() + Locals;
       StackMgr._pushFrame(Module, From, Func, ArgsN + Func->getLocalNum(), RetsN, VPos, false);
+
+      ifs.close();
 
       // debug
       std::string DebugPrefix = "[DEBUG]";
