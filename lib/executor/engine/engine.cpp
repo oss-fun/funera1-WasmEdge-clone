@@ -83,7 +83,18 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
       std::cerr << "restore memory" << std::endl;
       Migr.restoreGlobal(StackMgr.getModule());
       std::cerr << "restore global" << std::endl;
-      
+
+      // テスト用でリストアしたものがもとのファイルと一致するか確認
+      // For WasmEdge
+      Migr.dumpMemory(StackMgr.getModule());
+      std::cout << "Success dumpMemory" << std::endl;
+      Migr.dumpGlobal(StackMgr.getModule());
+      std::cout << "Success dumpGlobal" << std::endl;
+      Migr.dumpProgramCounter(StackMgr.getModule(), StartIt);
+      std::cout << "Success dumpIter" << std::endl;
+      Migr.dumpStack(StackMgr);
+      std::cout << "Success dumpStack" << std::endl;
+
       RestoreFlag = false;
     }
   

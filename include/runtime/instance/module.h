@@ -225,7 +225,7 @@ public:
   }
 
   Expect<void> restoreGlobInst() const noexcept {
-    std::ifstream ifs("memory.img", std::ios::binary);
+    std::ifstream ifs("global.img", std::ios::binary);
     if (!ifs) {
       return Unexpect(ErrCode::Value::IllegalPath);
     }

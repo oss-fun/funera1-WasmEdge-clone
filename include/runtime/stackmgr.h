@@ -99,13 +99,12 @@ public:
     TypeStack.pop_back();
     return V;
   }
-  
-  /// Push a new frame entry to stack.
-  void pushFrame(const Instance::ModuleInstance *Module,
-                 AST::InstrView::iterator From, uint32_t LocalNum = 0,
-                 uint32_t Arity = 0, bool IsTailCall = false) noexcept {
+
+  void _pushFrame(const Instance::ModuleInstance *Module,
+                 AST::InstrView::iterator From, const Runtime::Instance::FunctionInstance *EnterFunc, 
+                 uint32_t LocalNum, uint32_t Arity, uint32_t VPos, bool IsTailCall) noexcept {
     if (likely(!IsTailCall)) {
-      FrameStack.emplace_back(Module, From, nullptr, LocalNum, Arity, ValueStack.size());
+      FrameStack.emplace_back(Module, From, EnterFunc, LocalNum, Arity, VPos);
     } else {
       assuming(!FrameStack.empty());
       assuming(FrameStack.back().VPos >= FrameStack.back().Locals);
@@ -120,17 +119,24 @@ public:
 
       FrameStack.back().Module = Module;
       FrameStack.back().Locals = LocalNum;
-      FrameStack.back().EnterFunc = nullptr;
+      FrameStack.back().EnterFunc = EnterFunc;
       FrameStack.back().Arity = Arity;
-      FrameStack.back().VPos = static_cast<uint32_t>(ValueStack.size());
+      FrameStack.back().VPos = VPos;
     }
+  }
+  
+  /// Push a new frame entry to stack.
+  void pushFrame(const Instance::ModuleInstance *Module,
+                 AST::InstrView::iterator From, uint32_t LocalNum = 0,
+                 uint32_t Arity = 0, bool IsTailCall = false) noexcept {
+
+    _pushFrame(Module, From, nullptr, LocalNum, Arity, ValueStack.size(), IsTailCall);
   }
 
   void pushFrameExt(const Instance::ModuleInstance *Module,
                  AST::InstrView::iterator From, const Runtime::Instance::FunctionInstance *EnterFunc, 
                  uint32_t LocalNum = 0, uint32_t Arity = 0, bool IsTailCall = false) noexcept {
-    pushFrame(Module, From, LocalNum, Arity, IsTailCall);
-    FrameStack.back().EnterFunc = EnterFunc;
+    _pushFrame(Module, From, EnterFunc, LocalNum, Arity, ValueStack.size(), IsTailCall);
   }
 
   /// Unsafe pop top frame.

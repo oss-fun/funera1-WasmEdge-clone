@@ -499,7 +499,7 @@ public:
     }
 
     std::map<std::string_view, bool> seenModInst;
-    uint32_t PreTspOfs = 0;
+    uint32_t PreStackTop = 0;
     for (size_t I = 1; I < LenFrame; ++I) {
       std::ofstream ofs("stack" + std::to_string(I) + ".img", std::ios::trunc | std::ios::binary);
       Runtime::StackManager::Frame f = FrameStack[I];
@@ -523,17 +523,18 @@ public:
       ofs.write(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
 
       // 型スタック
-      uint32_t TspOfs = (f.VPos - f.Locals) - PreTspOfs;
+      uint32_t TspOfs = (f.VPos - f.Locals) - PreStackTop;
       ofs.write(reinterpret_cast<char *>(&TspOfs), sizeof(uint32_t));
-      for (uint32_t I = PreTspOfs+1; I <= TspOfs; I++) {
+      for (uint32_t I = PreStackTop; I < PreStackTop+TspOfs; I++) {
           ofs.write(reinterpret_cast<char *>(&TypeStack[I]), sizeof(uint8_t));
       }
 
       // 値スタック
       std::vector<ValVariant> ValueStack = StackMgr.getValueStack();
-      for (uint32_t I = PreTspOfs+1; I <= TspOfs; I++) {
+      for (uint32_t I = PreStackTop; I < PreStackTop+TspOfs; I++) {
         ofs.write(reinterpret_cast<char *>(&ValueStack[I].get<uint128_t>()), sizeof(uint32_t) * TypeStack[I]);
       }
+      PreStackTop += TspOfs;
 
       // ラベルスタック
       auto Res = ModInst->getFunc(FuncIdx);
@@ -701,7 +702,6 @@ public:
   }
 
   Expect<void> restoreStack(Runtime::StackManager& StackMgr) {
-    std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
     const Runtime::Instance::ModuleInstance *Module = StackMgr.getModule();
 
     uint32_t LenFrame;
@@ -741,7 +741,7 @@ public:
 
       // 型スタック
       uint32_t TspOfs;
-      uint32_t TspBase = TypeStack.size();
+      std::vector<uint8_t> TypeStack;
       ifs.read(reinterpret_cast<char *>(&TspOfs), sizeof(uint32_t));
       for (uint32_t I = 0; I < TspOfs; I++) {
         uint8_t type;
@@ -752,12 +752,14 @@ public:
       // 値スタック
       for (uint32_t I = 0; I < TspOfs; I++) {
         ValVariant value;
-        ifs.read(reinterpret_cast<char *>(&value), sizeof(uint32_t) * TypeStack[TspBase + I]);
+        ifs.read(reinterpret_cast<char *>(&value), sizeof(uint32_t) * TypeStack[I]);
         StackMgr.push(value, TypeStack[I]);
       }
 
       // TODO: Localsに対応する値をenterFunctionと対応してるか確認する
-      StackMgr.pushFrameExt(Module, From, Func, ArgsN + Func->getLocalNum(), RetsN);
+      uint32_t Locals = ArgsN + Func->getLocalNum();
+      uint32_t VPos = StackMgr.getValueStack().size() + Locals;
+      StackMgr._pushFrame(Module, From, Func, ArgsN + Func->getLocalNum(), RetsN, VPos, false);
     }
     return {};
   }
