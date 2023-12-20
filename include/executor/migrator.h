@@ -719,6 +719,7 @@ public:
     ifs.close();
 
     std::cerr << "frame stack size is " << StackMgr.getFrameStack().size() << std::endl;
+    std::cerr << "[DEBUG]ValueStack size: " << StackMgr.size() << std::endl;
 
     for (size_t I = 2; I < LenFrame; I++) {
       ifs.open("stack" + std::to_string(I) + ".img", std::ios::binary);
@@ -768,6 +769,7 @@ public:
       // TODO: Localsに対応する値をenterFunctionと対応してるか確認する
       uint32_t Locals = ArgsN + Func->getLocalNum();
       uint32_t VPos = StackMgr.getValueStack().size() + Locals;
+                      // + (Func->isWasmFunction() ? Locals : 0); // Localsを足すのはWasmFunctionのときのみ(enterFunction()より)
       StackMgr._pushFrame(Module, From, Func, ArgsN + Func->getLocalNum(), RetsN, VPos, false);
 
       ifs.close();
