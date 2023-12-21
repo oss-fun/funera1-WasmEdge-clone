@@ -264,7 +264,6 @@ public:
   void dumpStack(Runtime::StackManager& StackMgr) {
     std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
     std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
-    std::ofstream csp_tsp_fout("ctrl_tsp.img", std::ios::trunc | std::ios::binary);
     std::ofstream frame_fout("frame.img", std::ios::trunc | std::ios::binary);
 
     // header file. frame stackのサイズを記録
@@ -332,11 +331,9 @@ public:
         ofs.write(reinterpret_cast<char *>(&ci.BeginAddrOfs), sizeof(uint32_t));
         ofs.write(reinterpret_cast<char *>(&ci.TargetAddrOfs), sizeof(uint32_t));
         ofs.write(reinterpret_cast<char *>(&ci.SpOfs), sizeof(uint32_t));
+        ofs.write(reinterpret_cast<char *>(&ci.TspOfs), sizeof(uint32_t));
         ofs.write(reinterpret_cast<char *>(&ci.ResultCells), sizeof(uint32_t));
-
-        // TODO: ofsに統合
-        csp_tsp_fout.write(reinterpret_cast<char *>(&ci.TspOfs), sizeof(uint32_t));
-        csp_tsp_fout.write(reinterpret_cast<char *>(&ci.ResultCount), sizeof(uint32_t));
+        ofs.write(reinterpret_cast<char *>(&ci.ResultCount), sizeof(uint32_t));
       }
 
       ofs.close();
@@ -344,7 +341,6 @@ public:
       // debug
       debugFrame(I, EnterFuncIdx, f.Locals, f.Arity, f.VPos);
     }
-    csp_tsp_fout.close();
   }
   
   /// ================
