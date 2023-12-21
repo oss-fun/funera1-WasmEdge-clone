@@ -26,11 +26,12 @@ class StackManager {
 public:
   struct Frame {
     Frame() = delete;
-    Frame(const Instance::ModuleInstance *Mod, AST::InstrView::iterator FromIt,
+    Frame(const Instance::ModuleInstance *Mod, AST::InstrView::iterator FromIt, const Instance::FunctionInstance *Func,
           uint32_t L, uint32_t A, uint32_t V) noexcept
-        : Module(Mod), From(FromIt), Locals(L), Arity(A), VPos(V) {}
+        : Module(Mod), From(FromIt), EnterFunc(Func), Locals(L), Arity(A), VPos(V) {}
     const Instance::ModuleInstance *Module;
     AST::InstrView::iterator From;
+    const Instance::FunctionInstance *EnterFunc;
     uint32_t Locals;
     uint32_t Arity;
     uint32_t VPos;
@@ -79,15 +80,7 @@ public:
     ValueStack.push_back(std::forward<T>(Val));
     // 32bitなら0, 64bitなら1
     size_t t = sizeof(T);
-    if (t == 4) {
-      TypeStack.push_back((uint8_t)0);
-    }
-    else if (t == 8) {
-      TypeStack.push_back((uint8_t)1);
-    }
-    else {
-      TypeStack.push_back(std::forward<uint8_t>(2));
-    }
+    TypeStack.push_back(std::forward<uint8_t>(t/4));
     // std::cout << "[DEBUG]push stack: type kind: " << +TypeStack.back() << ", Pos: " << ValueStack.size() << " " << TypeStack.size() << std::endl;
   }
 
@@ -103,13 +96,12 @@ public:
     TypeStack.pop_back();
     return V;
   }
-  
-  /// Push a new frame entry to stack.
-  void pushFrame(const Instance::ModuleInstance *Module,
-                 AST::InstrView::iterator From, uint32_t LocalNum = 0,
-                 uint32_t Arity = 0, bool IsTailCall = false) noexcept {
+
+  void _pushFrame(const Instance::ModuleInstance *Module,
+                 AST::InstrView::iterator From, const Runtime::Instance::FunctionInstance *EnterFunc, 
+                 uint32_t LocalNum, uint32_t Arity, uint32_t VPos, bool IsTailCall) noexcept {
     if (likely(!IsTailCall)) {
-      FrameStack.emplace_back(Module, From, LocalNum, Arity, ValueStack.size());
+      FrameStack.emplace_back(Module, From, EnterFunc, LocalNum, Arity, VPos);
     } else {
       assuming(!FrameStack.empty());
       assuming(FrameStack.back().VPos >= FrameStack.back().Locals);
@@ -124,9 +116,24 @@ public:
 
       FrameStack.back().Module = Module;
       FrameStack.back().Locals = LocalNum;
+      FrameStack.back().EnterFunc = EnterFunc;
       FrameStack.back().Arity = Arity;
-      FrameStack.back().VPos = static_cast<uint32_t>(ValueStack.size());
+      FrameStack.back().VPos = VPos;
     }
+  }
+  
+  /// Push a new frame entry to stack.
+  void pushFrame(const Instance::ModuleInstance *Module,
+                 AST::InstrView::iterator From, uint32_t LocalNum = 0,
+                 uint32_t Arity = 0, bool IsTailCall = false) noexcept {
+
+    _pushFrame(Module, From, nullptr, LocalNum, Arity, ValueStack.size(), IsTailCall);
+  }
+
+  void pushFrameExt(const Instance::ModuleInstance *Module,
+                 AST::InstrView::iterator From, const Runtime::Instance::FunctionInstance *EnterFunc, 
+                 uint32_t LocalNum = 0, uint32_t Arity = 0, bool IsTailCall = false) noexcept {
+    _pushFrame(Module, From, EnterFunc, LocalNum, Arity, ValueStack.size(), IsTailCall);
   }
 
   /// Unsafe pop top frame.
@@ -186,16 +193,6 @@ public:
   }
   std::vector<uint8_t> getTypeStack() {
     return TypeStack;
-  }
-  
-  void setFrameStack(std::vector<Frame> fs) {
-    FrameStack = fs;
-  }
-  void setValueStack(std::vector<Value> vs) {
-    ValueStack = vs;
-  }
-  void setTypeStack(std::vector<uint8_t> ts) {
-    TypeStack = ts;
   }
   
 private:

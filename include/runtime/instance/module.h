@@ -181,10 +181,9 @@ public:
   }
 
   // Migration function
-  void dumpMemInst(std::string name) const noexcept {
+  void dumpMemInst() const noexcept {
     // std::unique_lock Lock(Mutex);
     // MemoryInstanceの保存
-    name = "hoge";
     for (uint32_t I = 0; I < getMemoryNum(); ++I) {
         auto Res = getMemory(I);
         MemoryInstance* MemInst = Res.value();
@@ -197,8 +196,7 @@ public:
     }
   }
 
-  void restoreMemInst(std::string name) const noexcept {
-    name = "hoge";
+  void restoreMemInst() const noexcept {
     for (uint32_t I = 0; I < getMemoryNum(); ++I) {
       auto Res = getMemory(I);
       MemoryInstance* MemInst = Res.value();
@@ -212,9 +210,8 @@ public:
     }
   }
   
-  Expect<void> dumpGlobInst(std::string name) const noexcept {
-    name += "global.img";
-    std::ofstream ofs(name, std::ios::trunc | std::ios::binary);
+  Expect<void> dumpGlobInst() const noexcept {
+    std::ofstream ofs("global.img", std::ios::trunc | std::ios::binary);
     if (!ofs) {
       return Unexpect(ErrCode::Value::IllegalPath);
     }
@@ -227,9 +224,8 @@ public:
     return {};
   }
 
-  Expect<void> restoreGlobInst(std::string name) const noexcept {
-    name += "global.img";
-    std::ifstream ifs(name, std::ios::binary);
+  Expect<void> restoreGlobInst() const noexcept {
+    std::ifstream ifs("global.img", std::ios::binary);
     if (!ifs) {
       return Unexpect(ErrCode::Value::IllegalPath);
     }

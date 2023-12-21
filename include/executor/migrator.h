@@ -125,6 +125,36 @@ public:
     }
     return ret;
   }
+
+  // 命令アドレスの状態表現 (fidx, offset)
+  std::pair<uint32_t, uint32_t> getInstrAddrExpr(const Runtime::Instance::ModuleInstance *ModInst, AST::InstrView::iterator it) {
+      IterMigratorType iterMigr = getIterMigratorByName(BaseModName);
+      struct SourceLoc Data = iterMigr[it];
+      auto Res = ModInst->getFunc(Data.FuncIdx);
+      Runtime::Instance::FunctionInstance* FuncInst = Res.value();
+      AST::InstrView::iterator PCStart = FuncInst->getInstrs().begin();
+      uint32_t Offset = it->getOffset() - PCStart->getOffset();
+
+      return std::make_pair(Data.FuncIdx, Offset);
+  }
+
+  // FunctioninstanceからFuncIdxを取得する
+  uint32_t getFuncIdx(const Runtime::Instance::FunctionInstance* Func) {
+    if (Func == nullptr) return -1;
+    AST::InstrView::iterator PC = Func->getInstrs().begin();
+    struct SourceLoc Data = getSourceLoc(PC);
+    return Data.FuncIdx;
+  }
+
+  void debugFrame(uint32_t FrameIdx, uint32_t EnterFuncIdx, uint32_t Locals, uint32_t Arity, uint32_t VPos) {
+      std::string DebugPrefix = "[DEBUG]";
+      std::cerr << DebugPrefix << "Frame Idx: " << FrameIdx << std::endl;
+      std::cerr << DebugPrefix << "EnterFuncIdx: " << EnterFuncIdx << std::endl;
+      std::cerr << DebugPrefix << "Locals: " << Locals << std::endl;
+      std::cerr << DebugPrefix << "Arity: "  << Arity << std::endl;
+      std::cerr << DebugPrefix << "VPos: "   << VPos << std::endl;
+      std::cerr << std::endl;
+  }
   
   // void debugFuncOpcode(uint32_t FuncIdx, uint32_t Offset, AST::InstrView::iterator it) {
   //   std::ofstream opcodeLog;
@@ -141,7 +171,7 @@ public:
   /// ================
   /// Dump functions for WAMR
   /// ================
-  void dumpStack(Runtime::StackManager& StackMgr) {
+  void dumpStackWamr(Runtime::StackManager& StackMgr) {
     std::ofstream fout;
     // fout.open("wamr_stack.img", std::ios::out | std::ios::binary | std::ios::trunc);
     fout.open("wamr_stack.img", std::ios::out | std::ios::trunc);
@@ -156,10 +186,6 @@ public:
       std::cerr << "TypStack size: " << Typs.size() << std::endl;
       exit(1);
     }
-
-    std::cout << "[DEBUG]TypeStack: [";
-    for (size_t I = 0; I < Vals.size(); ++I) std::cout << +Typs[I];
-    std::cout << "]" << std::endl;
 
     for (size_t I = 0; I < Vals.size(); ++I) {
       Value v = Vals[I];
@@ -240,7 +266,6 @@ public:
 
       PC++;
     }
-    
     return CtrlStack;
   }
   
@@ -421,6 +446,14 @@ public:
   /// ================
   /// Dump functions
   /// ================
+  void dumpMemory(const Runtime::Instance::ModuleInstance* ModInst) {
+    ModInst->dumpMemInst();
+  }
+
+  void dumpGlobal(const Runtime::Instance::ModuleInstance* ModInst) {
+    ModInst->dumpGlobInst();
+  }
+
   /// TODO: 関数名を中身にあったものにrenameする
   void preDumpIter(const Runtime::Instance::ModuleInstance* ModInst) {
     setIterMigrator(ModInst);
@@ -452,70 +485,164 @@ public:
     ofs.close();
     return {};
   }
-  
-  void dumpStackMgrFrame(Runtime::StackManager& StackMgr, std::string fname_header = "") {
+
+  void dumpStack(Runtime::StackManager& StackMgr) {
     std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
-    std::ofstream FrameStream;
-    FrameStream.open(fname_header + "stackmgr_frame.img", std::ios::trunc);
+    std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
+    std::ofstream csp_tsp_fout("ctrl_tsp.img", std::ios::trunc | std::ios::binary);
+    std::ofstream frame_fout("frame.img", std::ios::trunc | std::ios::binary);
+
+    // header file. frame stackのサイズを記録
+    uint32_t LenFrame = FrameStack.size();
+    frame_fout.write(reinterpret_cast<char *>(&LenFrame), sizeof(uint32_t));
+    frame_fout.close();
+    
+    // TypeStackからWAMRのセルの個数累積和みたいにする
+    // 累積和 1-indexed
+    std::vector<uint32_t> WamrCellSums(TypeStack.size()+1, 0);
+    for (uint32_t I = 0; I < TypeStack.size(); I++) {
+        WamrCellSums[I+1] = WamrCellSums[I] + (TypeStack[I] == 0 ? 1 : 2);
+    }
 
     std::map<std::string_view, bool> seenModInst;
-    for (size_t I = 0; I < FrameStack.size(); ++I) {
+    uint32_t PreStackTop = FrameStack[0].VPos - FrameStack[0].Locals;
+    for (size_t I = 1; I < LenFrame; ++I) {
+      std::ofstream ofs("stack" + std::to_string(I) + ".img", std::ios::trunc | std::ios::binary);
       Runtime::StackManager::Frame f = FrameStack[I];
 
       // ModuleInstance
       const Runtime::Instance::ModuleInstance* ModInst = f.Module;
 
-      // ModInstがnullの場合は、ModNameだけ出力して、continue
+      // ModInstがnullの場合、ModNameだけ出力してcontinue
       if (ModInst == nullptr) {
-        FrameStream << NULL_MOD_NAME << std::endl;
-        FrameStream << std::endl; 
-        continue; 
+        std::cerr << "ModInst is nullptr" << std::endl;
+        exit(1);
       }
 
-      std::string_view ModName = ModInst->getModuleName();
-      FrameStream << ModName << std::endl;
+      // 関数インデックス
+      uint32_t EnterFuncIdx = getFuncIdx(f.EnterFunc);
+      ofs.write(reinterpret_cast<char *>(&EnterFuncIdx), sizeof(uint32_t));
 
-      // まだそのModInstを保存してなければ、dumpする
-      if(!seenModInst[ModName]) {
-        ModInst->dumpMemInst(fname_header + std::string(ModName));
-        ModInst->dumpGlobInst(fname_header + std::string(ModName));
-        seenModInst[ModName] = true;
+      // リターンアドレス(uint32 fidx, uint32 offset)
+      auto [FuncIdx, Offset] = getInstrAddrExpr(ModInst, f.From);
+      ofs.write(reinterpret_cast<char *>(&FuncIdx), sizeof(uint32_t));
+      ofs.write(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
+
+      // 型スタック
+      uint32_t TspOfs = (f.VPos - f.Locals) - PreStackTop;
+      ofs.write(reinterpret_cast<char *>(&TspOfs), sizeof(uint32_t));
+      for (uint32_t I = PreStackTop; I < PreStackTop+TspOfs; I++) {
+          ofs.write(reinterpret_cast<char *>(&TypeStack[I]), sizeof(uint8_t));
       }
-      
-      // Iterator
-      IterMigratorType IterMigrator = getIterMigrator(ModInst);
-      struct SourceLoc Data = IterMigrator[const_cast<AST::InstrView::iterator>(f.From)];
 
-      FrameStream << Data.FuncIdx << std::endl;
-      FrameStream << Data.Offset << std::endl;
+      // 値スタック
+      std::vector<ValVariant> ValueStack = StackMgr.getValueStack();
+      for (uint32_t I = PreStackTop; I < PreStackTop+TspOfs; I++) {
+        ofs.write(reinterpret_cast<char *>(&ValueStack[I].get<uint128_t>()), sizeof(uint32_t) * TypeStack[I]);
+      }
+      PreStackTop += TspOfs;
 
-      // Locals, VPos, Arity
-      FrameStream << f.Locals << std::endl;
-      FrameStream << f.VPos << std::endl;
-      FrameStream << f.Arity << std::endl;
-      FrameStream << std::endl; 
-    }  
-    
-    FrameStream.close();
+      // ラベルスタック
+      auto Res = ModInst->getFunc(FuncIdx);
+      if (!Res) {
+        std::cerr << "FuncIdx isn't correct" << std::endl; 
+        exit(1);
+      }
+      Runtime::Instance::FunctionInstance* FuncInst = Res.value();
+      std::vector<struct CtrlInfo> CtrlStack = getCtrlStack(f.From, FuncInst, WamrCellSums);
+      uint32_t LenCs = CtrlStack.size();
+      ofs.write(reinterpret_cast<char *>(&LenCs), sizeof(uint32_t));
+      for (uint32_t I = 0; I < LenCs; I++) {
+        struct CtrlInfo ci = CtrlStack[I];
+        ofs.write(reinterpret_cast<char *>(&ci.BeginAddrOfs), sizeof(uint32_t));
+        ofs.write(reinterpret_cast<char *>(&ci.TargetAddrOfs), sizeof(uint32_t));
+        ofs.write(reinterpret_cast<char *>(&ci.SpOfs), sizeof(uint32_t));
+        ofs.write(reinterpret_cast<char *>(&ci.ResultCells), sizeof(uint32_t));
+
+        // TODO: ofsに統合
+        csp_tsp_fout.write(reinterpret_cast<char *>(&ci.TspOfs), sizeof(uint32_t));
+        csp_tsp_fout.write(reinterpret_cast<char *>(&ci.ResultCount), sizeof(uint32_t));
+      }
+
+      ofs.close();
+
+      // debug
+      debugFrame(I, EnterFuncIdx, f.Locals, f.Arity, f.VPos);
+    }
+    csp_tsp_fout.close();
   }
   
-  void dumpStackMgrValue(Runtime::StackManager& StackMgr, std::string fname_header = "") {
-    std::ofstream ValueStream;
-    ValueStream.open(fname_header + "stackmgr_value.img", std::ios::trunc);
+  // void dumpStackMgrFrame(Runtime::StackManager& StackMgr, std::string fname_header = "") {
+  //   std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
+  //   std::ofstream FrameStream;
+  //   FrameStream.open(fname_header + "stackmgr_frame.img", std::ios::trunc);
 
-    using Value = ValVariant;
-    std::vector<Value> ValueStack = StackMgr.getValueStack();
-    for (size_t I = 0; I < ValueStack.size(); ++I) {
-      Value v = ValueStack[I];
-      ValueStream << v.get<uint128_t>() << std::endl;
-    }
+  //   std::map<std::string_view, bool> seenModInst;
+  //   for (size_t I = 0; I < FrameStack.size(); ++I) {
+  //     Runtime::StackManager::Frame f = FrameStack[I];
+
+  //     // ModuleInstance
+  //     const Runtime::Instance::ModuleInstance* ModInst = f.Module;
+
+  //     // ModInstがnullの場合は、ModNameだけ出力して、continue
+  //     if (ModInst == nullptr) {
+  //       FrameStream << NULL_MOD_NAME << std::endl;
+  //       FrameStream << std::endl; 
+  //       continue; 
+  //     }
+
+  //     std::string_view ModName = ModInst->getModuleName();
+  //     FrameStream << ModName << std::endl;
+
+  //     // まだそのModInstを保存してなければ、dumpする
+  //     if(!seenModInst[ModName]) {
+  //       ModInst->dumpMemInst();
+  //       ModInst->dumpGlobInst();
+  //       seenModInst[ModName] = true;
+  //     }
+      
+  //     // Iterator
+  //     IterMigratorType IterMigrator = getIterMigrator(ModInst);
+  //     struct SourceLoc Data = IterMigrator[const_cast<AST::InstrView::iterator>(f.From)];
+
+  //     FrameStream << Data.FuncIdx << std::endl;
+  //     FrameStream << Data.Offset << std::endl;
+
+  //     // Locals, VPos, Arity
+  //     FrameStream << f.Locals << std::endl;
+  //     FrameStream << f.VPos << std::endl;
+  //     FrameStream << f.Arity << std::endl;
+  //     FrameStream << std::endl; 
+  //   }  
     
-    ValueStream.close();
-  }
+  //   FrameStream.close();
+  // }
+  
+  // void dumpStackMgrValue(Runtime::StackManager& StackMgr, std::string fname_header = "") {
+  //   std::ofstream ValueStream;
+  //   ValueStream.open(fname_header + "value_stack.img", std::ios::trunc);
+
+  //   using Value = ValVariant;
+  //   std::vector<Value> ValueStack = StackMgr.getValueStack();
+  //   for (size_t I = 0; I < ValueStack.size(); ++I) {
+  //     Value v = ValueStack[I];
+  //     ValueStream << v.get<uint128_t>() << std::endl;
+  //   }
+    
+  //   ValueStream.close();
+  // }
   
   /// ================
   /// Restore functions
   /// ================
+  void restoreMemory(const Runtime::Instance::ModuleInstance* ModInst) {
+    ModInst->restoreMemInst();
+  }
+
+  void restoreGlobal(const Runtime::Instance::ModuleInstance* ModInst) {
+    ModInst->restoreGlobInst();
+  }
+
   Expect<AST::InstrView::iterator> _restoreIter(const Runtime::Instance::ModuleInstance* ModInst, uint32_t FuncIdx, uint32_t Offset) {
     assert(ModInst != nullptr);
     
@@ -582,117 +709,194 @@ public:
     auto Res = _restorePC(ModInst, FuncIdx, Offset);
     return Res;
   }
-  
-  Expect<std::vector<Runtime::StackManager::Frame>> restoreStackMgrFrame() {
-    std::ifstream FrameStream;
-    FrameStream.open("stackmgr_frame.img");
-    Runtime::StackManager StackMgr;
 
-    std::vector<Runtime::StackManager::Frame> FrameStack;
-    FrameStack.reserve(16U);
-    std::string FrameString;
-    /// TODO: ループ条件見直す
-    std::map<std::string, const Runtime::Instance::ModuleInstance*> ModCache;
-    while(getline(FrameStream, FrameString)) {
-      // ModuleInstance
-      std::string ModName = FrameString;
-      const Runtime::Instance::ModuleInstance* ModInst;
+  Expect<void> restoreStack(Runtime::StackManager& StackMgr) {
+    const Runtime::Instance::ModuleInstance *Module = StackMgr.getModule();
 
-      // ModInstがnullの場合
-      if (ModName == NULL_MOD_NAME) {
-        Runtime::StackManager::Frame f(nullptr, nullptr, 0, 0, 0);
-        FrameStack.push_back(f);
+    uint32_t LenFrame;
+    std::ifstream ifs("frame.img", std::ios::binary);
+    ifs.read(reinterpret_cast<char *>(&LenFrame), sizeof(uint32_t));
+    ifs.close();
 
-        // 次の行がなければ終了
-        if(!getline(FrameStream, FrameString)) {
-          break;
-        }
-        continue;
+    std::cerr << "frame stack size is " << StackMgr.getFrameStack().size() << std::endl;
+    std::cerr << "[DEBUG]ValueStack size: " << StackMgr.size() << std::endl;
+
+    for (size_t I = 2; I < LenFrame; I++) {
+      ifs.open("stack" + std::to_string(I) + ".img", std::ios::binary);
+
+      // 関数インデックスのロード
+      uint32_t EnterFuncIdx;
+      ifs.read(reinterpret_cast<char *>(&EnterFuncIdx), sizeof(uint32_t));
+      
+      // リターンアドレスのロード
+      uint32_t FuncIdx, Offset;
+      ifs.read(reinterpret_cast<char *>(&FuncIdx), sizeof(uint32_t));
+      ifs.read(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
+
+      // 型スタック
+      uint32_t TspOfs;
+      std::vector<uint8_t> TypeStack;
+      ifs.read(reinterpret_cast<char *>(&TspOfs), sizeof(uint32_t));
+      for (uint32_t I = 0; I < TspOfs; I++) {
+        uint8_t type;
+        ifs.read(reinterpret_cast<char *>(&type), sizeof(uint8_t));
+        TypeStack.push_back(type);
       }
 
-      // ModInstがnullじゃない場合
-      ModInst = findModule(ModName);
-      if (ModInst == nullptr) {
-        assert(-1);
+      // 値スタック
+      for (uint32_t I = 0; I < TspOfs; I++) {
+        ValVariant Value;
+        ifs.read(reinterpret_cast<char *>(&Value), sizeof(uint32_t) * TypeStack[I]);
+        StackMgr.push(Value, TypeStack[I]);
       }
 
-      /// TODO: 同じModuleの復元をしないよう、キャッシュを作る
-      if (ModCache.count(ModName) == 0) {
-        ModInst->restoreMemInst(std::string(ModName));
-        ModInst->restoreGlobInst(std::string(ModName));
-        ModCache[ModName] = ModInst;
+      // 最後のフレームは元のWasmEdgeフレームスタックには入ってないもの
+      // 値スタックと型スタックのみ復元する
+      if (I == LenFrame-1) break;
+
+      // リターンアドレスの復元
+      auto ResFrom = _restorePC(Module, FuncIdx, Offset);
+      if (!ResFrom) {
+        return Unexpect(ResFrom);
       }
-      else {
-        ModInst = ModCache[ModName];
+      AST::InstrView::iterator From = ResFrom.value();
+
+      // ローカルと返り値の数
+      auto ResFunc = Module->getFunc(EnterFuncIdx);
+      if (!ResFunc) {
+        return Unexpect(ResFunc);
       }
+      const Runtime::Instance::FunctionInstance* Func = ResFunc.value();
+      const auto &FuncType = Func->getFuncType();
+      const uint32_t ArgsN = static_cast<uint32_t>(FuncType.getParamTypes().size());
+      const uint32_t RetsN =
+          static_cast<uint32_t>(FuncType.getReturnTypes().size());
 
-      // Iterator
-      getline(FrameStream, FrameString);
-      uint32_t FuncIdx = static_cast<uint32_t>(std::stoul(FrameString));
-      getline(FrameStream, FrameString);
-      uint32_t Offset = static_cast<uint32_t>(std::stoul(FrameString));
-      auto Res = _restoreIter(ModInst, FuncIdx, Offset);
-      if (!Res) {
-        return Unexpect(Res);
-      }
-      AST::InstrView::iterator From = Res.value();
-      // AST::InstrView::iterator From = _restoreIter(ModInst, FuncIdx, Offset).value();
+      // TODO: Localsに対応する値をenterFunctionと対応してるか確認する
+      uint32_t Locals = ArgsN + Func->getLocalNum();
+      uint32_t VPos = StackMgr.getValueStack().size() + Locals;
 
-      // Locals, VPos, Arity
-      getline(FrameStream, FrameString);
-      uint32_t Locals = static_cast<uint32_t>(std::stoul(FrameString));
-      getline(FrameStream, FrameString);
-      uint32_t VPos = static_cast<uint32_t>(std::stoul(FrameString));
-      getline(FrameStream, FrameString);
-      uint32_t Arity = static_cast<uint32_t>(std::stoul(FrameString));
+      StackMgr._pushFrame(Module, From, Func, Locals, RetsN, VPos, false);
+      ifs.close();
 
-      Runtime::StackManager::Frame f(ModInst, From, Locals, Arity, VPos);
-      FrameStack.push_back(f);
-
-      // 空の行を読み捨て
-      getline(FrameStream, FrameString);
+      // debug
+      debugFrame(I, EnterFuncIdx, Locals, RetsN, VPos);
     }
-
-    FrameStream.close();
-    return FrameStack;
+    return {};
   }
+
   
-  Expect<std::vector<Runtime::StackManager::Value>> restoreStackMgrValue() {	  // Runtime::StackManager restoreStackMgr() {
-    std::ifstream ValueStream;	  // }
-    ValueStream.open("stackmgr_value.img");	
-    Runtime::StackManager StackMgr;	
+  // Expect<std::vector<Runtime::StackManager::Frame>> restoreStackMgrFrame() {
+  //   std::ifstream FrameStream;
+  //   FrameStream.open("stackmgr_frame.img");
+  //   Runtime::StackManager StackMgr;
 
-    std::vector<Runtime::StackManager::Value> ValueStack;	
-    ValueStack.reserve(2048U);
-    std::string ValueString;	
-    /// TODO: ループ条件見直す	
-    while(getline(ValueStream, ValueString)) {	
-      // ValueStringが空の場合はエラー	
-      assert(ValueString.size() > 0);	
+  //   std::vector<Runtime::StackManager::Frame> FrameStack;
+  //   FrameStack.reserve(16U);
+  //   std::string FrameString;
+  //   /// TODO: ループ条件見直す
+  //   std::map<std::string, const Runtime::Instance::ModuleInstance*> ModCache;
+  //   while(getline(FrameStream, FrameString)) {
+  //     // ModuleInstance
+  //     std::string ModName = FrameString;
+  //     const Runtime::Instance::ModuleInstance* ModInst;
 
-      /// TODO: stoullは64bitまでしか受け取らないので、128bitの入力が来たら壊れる
-      Runtime::StackManager::Value v = static_cast<uint128_t>(stou128(ValueString));	
-      ValueStack.push_back(v);	
-    }	
+  //     // ModInstがnullの場合
+  //     if (ModName == NULL_MOD_NAME) {
+  //       Runtime::StackManager::Frame f(nullptr, nullptr, 0, 0, 0);
+  //       FrameStack.push_back(f);
 
-    ValueStream.close();	
-    return ValueStack;    	
-  }
+  //       // 次の行がなければ終了
+  //       if(!getline(FrameStream, FrameString)) {
+  //         break;
+  //       }
+  //       continue;
+  //     }
 
-  Expect<Runtime::StackManager> restoreStackMgr() {
-    std::vector<Runtime::StackManager::Frame> fs = restoreStackMgrFrame().value();
-    std::cout << "Success to restore stack frame" << std::endl;
+  //     // ModInstがnullじゃない場合
+  //     ModInst = findModule(ModName);
+  //     if (ModInst == nullptr) {
+  //       assert(-1);
+  //     }
 
-    std::vector<Runtime::StackManager::Value> vs = restoreStackMgrValue().value();
-    std::cout << "Success to restore stack value" << std::endl;
+  //     /// TODO: 同じModuleの復元をしないよう、キャッシュを作る
+  //     if (ModCache.count(ModName) == 0) {
+  //       ModInst->restoreMemInst(std::string(ModName));
+  //       ModInst->restoreGlobInst(std::string(ModName));
+  //       ModCache[ModName] = ModInst;
+  //     }
+  //     else {
+  //       ModInst = ModCache[ModName];
+  //     }
 
-    Runtime::StackManager StackMgr;
-    StackMgr.setFrameStack(fs);
-    StackMgr.setValueStack(vs);
-    std::cout << "Success to restore stack manager" << std::endl;
+  //     // Iterator
+  //     getline(FrameStream, FrameString);
+  //     uint32_t FuncIdx = static_cast<uint32_t>(std::stoul(FrameString));
+  //     getline(FrameStream, FrameString);
+  //     uint32_t Offset = static_cast<uint32_t>(std::stoul(FrameString));
+  //     auto Res = _restoreIter(ModInst, FuncIdx, Offset);
+  //     if (!Res) {
+  //       return Unexpect(Res);
+  //     }
+  //     AST::InstrView::iterator From = Res.value();
+  //     // AST::InstrView::iterator From = _restoreIter(ModInst, FuncIdx, Offset).value();
 
-    return StackMgr;
-  }
+  //     // Locals, VPos, Arity
+  //     getline(FrameStream, FrameString);
+  //     uint32_t Locals = static_cast<uint32_t>(std::stoul(FrameString));
+  //     getline(FrameStream, FrameString);
+  //     uint32_t VPos = static_cast<uint32_t>(std::stoul(FrameString));
+  //     getline(FrameStream, FrameString);
+  //     uint32_t Arity = static_cast<uint32_t>(std::stoul(FrameString));
+
+  //     Runtime::StackManager::Frame f(ModInst, From, Locals, Arity, VPos);
+  //     FrameStack.push_back(f);
+
+  //     // 空の行を読み捨て
+  //     getline(FrameStream, FrameString);
+  //   }
+
+  //   FrameStream.close();
+  //   return FrameStack;
+  // }
+
+  
+  // Expect<std::vector<Runtime::StackManager::Value>> restoreStackMgrValue() {	  // Runtime::StackManager restoreStackMgr() {
+  //   std::ifstream ValueStream;	  // }
+  //   ValueStream.open("value_stack.img");	
+  //   Runtime::StackManager StackMgr;	
+
+  //   std::vector<Runtime::StackManager::Value> ValueStack;	
+  //   ValueStack.reserve(2048U);
+  //   std::string ValueString;	
+  //   /// TODO: ループ条件見直す	
+  //   while(getline(ValueStream, ValueString)) {	
+  //     // ValueStringが空の場合はエラー	
+  //     assert(ValueString.size() > 0);	
+
+  //     /// TODO: stoullは64bitまでしか受け取らないので、128bitの入力が来たら壊れる
+  //     Runtime::StackManager::Value v = static_cast<uint128_t>(stou128(ValueString));	
+  //     ValueStack.push_back(v);	
+  //   }	
+
+  //   ValueStream.close();	
+  //   return ValueStack;    	
+  // }
+
+  // Expect<Runtime::StackManager> restoreStackMgr() {
+  //   std::vector<Runtime::StackManager::Frame> fs = restoreStackMgrFrame().value();
+  //   std::cout << "Success to restore stack frame" << std::endl;
+
+  //   std::vector<Runtime::StackManager::Value> vs = restoreStackMgrValue().value();
+  //   std::cout << "Success to restore stack value" << std::endl;
+
+  //   Runtime::StackManager StackMgr;
+  //   StackMgr.setFrameStack(fs);
+  //   StackMgr.setValueStack(vs);
+  //   std::cout << "Success to restore stack manager" << std::endl;
+
+  //   return StackMgr;
+  // }
 
   bool DumpFlag; 
   bool RestoreFlag;
