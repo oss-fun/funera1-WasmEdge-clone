@@ -69,31 +69,18 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
 
     // Restore
     if (RestoreFlag && Conf.getStatisticsConfigure().getRestoreFlag()) {
-      // std::cout << "### Restore! ###" << std::endl;
       auto Res = Migr.restoreProgramCounter(Func.getModule());
       if (!Res) {
         return Unexpect(Res);
       }
       StartIt = Res.value();
-      std::cerr << "restore pc" << std::endl;
-
+      std::cerr << "Restore pc" << std::endl;
       Migr.restoreStack(StackMgr);
-      std::cerr << "restore stack" << std::endl;
+      std::cerr << "Restore stack" << std::endl;
       Migr.restoreMemory(StackMgr.getModule());
-      std::cerr << "restore memory" << std::endl;
+      std::cerr << "Restore memory" << std::endl;
       Migr.restoreGlobal(StackMgr.getModule());
-      std::cerr << "restore global" << std::endl;
-
-      // テスト用でリストアしたものがもとのファイルと一致するか確認
-      // For WasmEdge
-      Migr.dumpMemory(StackMgr.getModule());
-      std::cout << "Success dumpMemory" << std::endl;
-      Migr.dumpGlobal(StackMgr.getModule());
-      std::cout << "Success dumpGlobal" << std::endl;
-      Migr.dumpProgramCounter(StackMgr.getModule(), StartIt);
-      std::cout << "Success dumpIter" << std::endl;
-      Migr.dumpStack(StackMgr);
-      std::cout << "Success dumpStack" << std::endl;
+      std::cerr << "Restore global" << std::endl;
 
       RestoreFlag = false;
     }
@@ -1918,28 +1905,18 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
 
     if (DumpFlag) {
       if (Conf.getStatisticsConfigure().getDumpFlag()) {
-        // For WAMR
-        // Migr.dumpMemory(StackMgr.getModule());
-        // std::cout << "Success dumpMemory for WAMR" << std::endl;
-        Migr.dumpStackWamr(StackMgr);
-        std::cout << "Success dumpStack for WAMR" << std::endl;
-
-        // TODO: pushFrameExtで関数インスタンスの値が必要
-        StackMgr.pushFrame(StackMgr.getModule(), PC, 0, 0, false);
-        Migr.dumpFrame(StackMgr);
-        std::cout << "Success dumpFrame for WAMR" << std::endl;
-        StackMgr.popFrame();
-
         // For WasmEdge
         Migr.dumpMemory(StackMgr.getModule());
+        std::cerr << "Success dumpMemory" << std::endl;
         Migr.dumpGlobal(StackMgr.getModule());
+        std::cerr << "Success dumpGlobal" << std::endl;
         Migr.dumpProgramCounter(StackMgr.getModule(), PC);
-        std::cout << "Success dumpIter" << std::endl;
+        std::cerr << "Success dumpIter" << std::endl;
 
         StackMgr.pushFrame(StackMgr.getModule(), PC, 0, 0, false);
         Migr.dumpStack(StackMgr);
         StackMgr.popFrame();
-        std::cout << "Success dumpStack" << std::endl;
+        std::cerr << "Success dumpStack" << std::endl;
       }
       return {};
     }

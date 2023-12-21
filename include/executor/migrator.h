@@ -145,6 +145,16 @@ public:
     struct SourceLoc Data = getSourceLoc(PC);
     return Data.FuncIdx;
   }
+
+  void debugFrame(uint32_t FrameIdx, uint32_t EnterFuncIdx, uint32_t Locals, uint32_t Arity, uint32_t VPos) {
+      std::string DebugPrefix = "[DEBUG]";
+      std::cerr << DebugPrefix << "Frame Idx: " << FrameIdx << std::endl;
+      std::cerr << DebugPrefix << "EnterFuncIdx: " << EnterFuncIdx << std::endl;
+      std::cerr << DebugPrefix << "Locals: " << Locals << std::endl;
+      std::cerr << DebugPrefix << "Arity: "  << Arity << std::endl;
+      std::cerr << DebugPrefix << "VPos: "   << VPos << std::endl;
+      std::cerr << std::endl;
+  }
   
   // void debugFuncOpcode(uint32_t FuncIdx, uint32_t Offset, AST::InstrView::iterator it) {
   //   std::ofstream opcodeLog;
@@ -176,10 +186,6 @@ public:
       std::cerr << "TypStack size: " << Typs.size() << std::endl;
       exit(1);
     }
-
-    // std::cout << "[DEBUG]TypeStack: [";
-    // for (size_t I = 0; I < Vals.size(); ++I) std::cout << +Typs[I];
-    // std::cout << "]" << std::endl;
 
     for (size_t I = 0; I < Vals.size(); ++I) {
       Value v = Vals[I];
@@ -561,13 +567,7 @@ public:
       ofs.close();
 
       // debug
-      std::string DebugPrefix = "[DEBUG]";
-      std::cerr << DebugPrefix << "Frame Idx: " << I << std::endl;
-      std::cerr << DebugPrefix << "EnterFuncIdx: " << EnterFuncIdx << std::endl;
-      std::cerr << DebugPrefix << "Locals: " << f.Locals << std::endl;
-      std::cerr << DebugPrefix << "Arity: "  << f.Arity << std::endl;
-      std::cerr << DebugPrefix << "VPos: "   << f.VPos << std::endl;
-      std::cerr << std::endl;
+      debugFrame(I, EnterFuncIdx, f.Locals, f.Arity, f.VPos);
     }
     csp_tsp_fout.close();
   }
@@ -776,20 +776,15 @@ public:
       uint32_t Locals = ArgsN + Func->getLocalNum();
       uint32_t VPos = StackMgr.getValueStack().size() + Locals;
 
-      StackMgr._pushFrame(Module, From, Func, ArgsN + Func->getLocalNum(), RetsN, VPos, false);
+      StackMgr._pushFrame(Module, From, Func, Locals, RetsN, VPos, false);
       ifs.close();
 
       // debug
-      std::string DebugPrefix = "[DEBUG]";
-      std::cerr << DebugPrefix << "Frame Idx: " << I << std::endl;
-      std::cerr << DebugPrefix << "EnterFuncIdx: " << EnterFuncIdx << std::endl;
-      std::cerr << DebugPrefix << "Locals: " << ArgsN+Func->getLocalNum() << std::endl;
-      std::cerr << DebugPrefix << "Arity: "  << RetsN << std::endl;
-      std::cerr << DebugPrefix << "VPos: "   << VPos << std::endl;
-      std::cerr << std::endl;
+      debugFrame(I, EnterFuncIdx, Locals, RetsN, VPos);
     }
     return {};
   }
+
   
   // Expect<std::vector<Runtime::StackManager::Frame>> restoreStackMgrFrame() {
   //   std::ifstream FrameStream;

@@ -195,16 +195,6 @@ public:
     return TypeStack;
   }
   
-  void setFrameStack(std::vector<Frame> fs) {
-    FrameStack = fs;
-  }
-  void setValueStack(std::vector<Value> vs) {
-    ValueStack = vs;
-  }
-  void setTypeStack(std::vector<uint8_t> ts) {
-    TypeStack = ts;
-  }
-  
 private:
   /// \name Data of stack manager.
   /// @{
