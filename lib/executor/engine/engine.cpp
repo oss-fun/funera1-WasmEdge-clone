@@ -82,6 +82,9 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
       Migr.restoreGlobal(StackMgr.getModule());
       std::cerr << "Restore global" << std::endl;
 
+      // debug
+      Migr.dumpStack(StackMgr, StartIt);
+
       RestoreFlag = false;
     }
   
@@ -1913,11 +1916,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
         Migr.dumpProgramCounter(StackMgr.getModule(), PC);
         std::cerr << "Success dumpIter" << std::endl;
 
-        // StackMgr.pushFrame(StackMgr.getModule(), PC, 0, 0, false);
-        // Migr.dumpStack(StackMgr, PC);
-        // StackMgr.popFrame();
-
-        Migr.dumpStack2(StackMgr, PC);
+        Migr.dumpStack(StackMgr, PC);
         std::cerr << "Success dumpStack" << std::endl;
       }
       return {};

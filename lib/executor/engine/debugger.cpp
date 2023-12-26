@@ -68,7 +68,8 @@ void InteractiveMode(SourceLoc &bp, SourceLoc pc, Runtime::StackManager &StackMg
         std::cout << "PC is " << pc.FuncIdx << " " << pc.Offset << std::endl;
       }
       if (commands[1] == "frame") {
-        Migr.dumpStack(StackMgr);
+        StackMgr.size();
+        // Migr.dumpStack(StackMgr, PC);
       }
     }
     else if (commands[0] == "d" || commands[0] == "dump") {

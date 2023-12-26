@@ -45,9 +45,8 @@ Executor::enterFunction(Runtime::StackManager &StackMgr,
     Runtime::CallingFrame CallFrame(this, ModInst);
 
     // Push frame.
-    StackMgr.pushFrameExt(Func.getModule(), // Module instance
+    StackMgr.pushFrame(Func.getModule(), // Module instance
                        RetIt,            // Return PC
-                       &Func,
                        ArgsN,            // Only args, no locals in stack
                        RetsN,            // Returns num
                        IsTailCall        // For tail-call
@@ -111,9 +110,8 @@ Executor::enterFunction(Runtime::StackManager &StackMgr,
     // continuation.
 
     // Push frame.
-    StackMgr.pushFrameExt(Func.getModule(), // Module instance
+    StackMgr.pushFrame(Func.getModule(), // Module instance
                        RetIt,            // Return PC
-                       &Func,
                        ArgsN,            // Only args, no locals in stack
                        RetsN,            // Returns num
                        IsTailCall        // For tail-call
@@ -186,9 +184,8 @@ Executor::enterFunction(Runtime::StackManager &StackMgr,
     // Push frame.
     // The PC must -1 here because in the interpreter mode execution, the PC
     // will increase after the callee return.
-    StackMgr.pushFrameExt(Func.getModule(),           // Module instance
+    StackMgr.pushFrame(Func.getModule(),           // Module instance
                        RetIt - 1,                  // Return PC
-                       &Func,
                        ArgsN + Func.getLocalNum(), // Arguments num + local num
                        RetsN,                      // Returns num
                        IsTailCall                  // For tail-call

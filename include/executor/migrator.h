@@ -266,89 +266,7 @@ public:
     return {};
   }
 
-  void dumpStack(Runtime::StackManager& StackMgr) {
-    std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
-    std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
-    std::ofstream frame_fout("frame.img", std::ios::trunc | std::ios::binary);
-
-    // header file. frame stackのサイズを記録
-    uint32_t LenFrame = FrameStack.size();
-    frame_fout.write(reinterpret_cast<char *>(&LenFrame), sizeof(uint32_t));
-    frame_fout.close();
-    
-    // TypeStackからWAMRのセルの個数累積和みたいにする
-    // 累積和 1-indexed
-    std::vector<uint32_t> WamrCellSums(TypeStack.size()+1, 0);
-    for (uint32_t I = 0; I < TypeStack.size(); I++) {
-        WamrCellSums[I+1] = WamrCellSums[I] + (TypeStack[I] == 0 ? 1 : 2);
-    }
-
-    std::map<std::string_view, bool> seenModInst;
-    uint32_t PreStackTop = FrameStack[0].VPos - FrameStack[0].Locals;
-    for (size_t I = 1; I < LenFrame; ++I) {
-      std::ofstream ofs("stack" + std::to_string(I) + ".img", std::ios::trunc | std::ios::binary);
-      Runtime::StackManager::Frame f = FrameStack[I];
-
-      // ModuleInstance
-      const Runtime::Instance::ModuleInstance* ModInst = f.Module;
-
-      // ModInstがnullの場合、ModNameだけ出力してcontinue
-      if (ModInst == nullptr) {
-        std::cerr << "ModInst is nullptr" << std::endl;
-        exit(1);
-      }
-
-      // 関数インデックス
-      uint32_t EnterFuncIdx = getFuncIdx(f.EnterFunc);
-      ofs.write(reinterpret_cast<char *>(&EnterFuncIdx), sizeof(uint32_t));
-
-      // リターンアドレス(uint32 fidx, uint32 offset)
-      auto [FuncIdx, Offset] = getInstrAddrExpr(ModInst, f.From);
-      ofs.write(reinterpret_cast<char *>(&FuncIdx), sizeof(uint32_t));
-      ofs.write(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
-
-      // 型スタック
-      uint32_t TspOfs = (f.VPos - f.Locals) - PreStackTop;
-      ofs.write(reinterpret_cast<char *>(&TspOfs), sizeof(uint32_t));
-      for (uint32_t I = PreStackTop; I < PreStackTop+TspOfs; I++) {
-          ofs.write(reinterpret_cast<char *>(&TypeStack[I]), sizeof(uint8_t));
-      }
-
-      // 値スタック
-      std::vector<ValVariant> ValueStack = StackMgr.getValueStack();
-      for (uint32_t I = PreStackTop; I < PreStackTop+TspOfs; I++) {
-        ofs.write(reinterpret_cast<char *>(&ValueStack[I].get<uint128_t>()), sizeof(uint32_t) * TypeStack[I]);
-      }
-      PreStackTop += TspOfs;
-
-      // ラベルスタック
-      auto Res = ModInst->getFunc(FuncIdx);
-      if (!Res) {
-        std::cerr << "FuncIdx isn't correct" << std::endl; 
-        exit(1);
-      }
-      Runtime::Instance::FunctionInstance* FuncInst = Res.value();
-      std::vector<struct CtrlInfo> CtrlStack = getCtrlStack(f.From, FuncInst, WamrCellSums);
-      uint32_t LenCs = CtrlStack.size();
-      ofs.write(reinterpret_cast<char *>(&LenCs), sizeof(uint32_t));
-      for (uint32_t I = 0; I < LenCs; I++) {
-        struct CtrlInfo ci = CtrlStack[I];
-        ofs.write(reinterpret_cast<char *>(&ci.BeginAddrOfs), sizeof(uint32_t));
-        ofs.write(reinterpret_cast<char *>(&ci.TargetAddrOfs), sizeof(uint32_t));
-        ofs.write(reinterpret_cast<char *>(&ci.SpOfs), sizeof(uint32_t));
-        ofs.write(reinterpret_cast<char *>(&ci.TspOfs), sizeof(uint32_t));
-        ofs.write(reinterpret_cast<char *>(&ci.ResultCells), sizeof(uint32_t));
-        ofs.write(reinterpret_cast<char *>(&ci.ResultCount), sizeof(uint32_t));
-      }
-
-      ofs.close();
-
-      // debug
-      // debugFrame(I, EnterFuncIdx, f.Locals, f.Arity, f.VPos);
-    }
-  }
-
-  void dumpStack2(Runtime::StackManager& StackMgr, AST::InstrView::iterator PC) {
+  void dumpStack(Runtime::StackManager& StackMgr, AST::InstrView::iterator PC) {
     std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
     std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
     std::ofstream frame_fout("frame.img", std::ios::trunc | std::ios::binary);
@@ -431,9 +349,10 @@ public:
       // 各値を更新
       PC = f.From;
       StackTop = StackBottom;
+      // std::cerr << "[DEBUG]StackTop is " << StackTop << std::endl;
 
       // debug
-      debugFrame(I, EnterFuncIdx, f.Locals, f.Arity, f.VPos);
+      // debugFrame(I, EnterFuncIdx, f.Locals, f.Arity, f.VPos);
     }
   }
   
@@ -523,9 +442,6 @@ public:
     ifs.read(reinterpret_cast<char *>(&LenFrame), sizeof(uint32_t));
     ifs.close();
 
-    std::cerr << "frame stack size is " << StackMgr.getFrameStack().size() << std::endl;
-    std::cerr << "[DEBUG]ValueStack size: " << StackMgr.size() << std::endl;
-
     for (size_t I = LenFrame-2; I > 0; --I) {
       ifs.open("stack" + std::to_string(I) + ".img", std::ios::binary);
 
@@ -544,6 +460,23 @@ public:
       }
       AST::InstrView::iterator From = ResFrom.value();
 
+      // ローカルと返り値の数
+      auto ResFunc = Module->getFunc(EnterFuncIdx);
+      if (!ResFunc) {
+        return Unexpect(ResFunc);
+      }
+      const Runtime::Instance::FunctionInstance* Func = ResFunc.value();
+      const auto &FuncType = Func->getFuncType();
+      const uint32_t ArgsN = static_cast<uint32_t>(FuncType.getParamTypes().size());
+      const uint32_t RetsN =
+          static_cast<uint32_t>(FuncType.getReturnTypes().size());
+
+      // TODO: Localsに対応する値をenterFunctionと対応してるか確認する
+      uint32_t Locals = ArgsN + Func->getLocalNum();
+      uint32_t VPos = StackMgr.size() + Locals;
+
+      StackMgr._pushFrame(Module, From, Locals, RetsN, VPos, false);
+
       // 型スタック
       uint32_t TspOfs;
       std::vector<uint8_t> TypeStack;
@@ -561,33 +494,11 @@ public:
         StackMgr.push(Value, TypeStack[I]);
       }
 
-      // 最後のフレームは元のWasmEdgeフレームスタックには入ってないもの
-      // 値スタックと型スタックのみ復元する
-      // if (I == LenFrame-1) break;
-
-
-      // ローカルと返り値の数
-      auto ResFunc = Module->getFunc(EnterFuncIdx);
-      if (!ResFunc) {
-        return Unexpect(ResFunc);
-      }
-      const Runtime::Instance::FunctionInstance* Func = ResFunc.value();
-      const auto &FuncType = Func->getFuncType();
-      const uint32_t ArgsN = static_cast<uint32_t>(FuncType.getParamTypes().size());
-      const uint32_t RetsN =
-          static_cast<uint32_t>(FuncType.getReturnTypes().size());
-
-      // TODO: Localsに対応する値をenterFunctionと対応してるか確認する
-      uint32_t Locals = ArgsN + Func->getLocalNum();
-      uint32_t VPos = StackMgr.getValueStack().size() + Locals;
-
-      StackMgr._pushFrame(Module, From, Func, Locals, RetsN, VPos, false);
       ifs.close();
 
       // debug
       // debugFrame(I, EnterFuncIdx, Locals, RetsN, VPos);
     }
-    std::cerr << "FrameStack Size: " << StackMgr.getFrameStack().size() << std::endl;
     return {};
   }
 
