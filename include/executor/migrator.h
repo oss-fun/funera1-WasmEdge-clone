@@ -122,12 +122,17 @@ public:
       return std::make_pair(Data.FuncIdx, Offset);
   }
 
+  uint32_t getFuncIdx(const AST::InstrView::iterator PC) {
+    if (PC == nullptr) return -1;
+    struct SourceLoc Data = getSourceLoc(PC);
+    return Data.FuncIdx;
+  }
+
   // FunctioninstanceからFuncIdxを取得する
   uint32_t getFuncIdx(const Runtime::Instance::FunctionInstance* Func) {
     if (Func == nullptr) return -1;
     AST::InstrView::iterator PC = Func->getInstrs().begin();
-    struct SourceLoc Data = getSourceLoc(PC);
-    return Data.FuncIdx;
+    return getFuncIdx(PC);
   }
 
 
@@ -337,6 +342,95 @@ public:
       }
 
       ofs.close();
+
+      // debug
+      debugFrame(I, EnterFuncIdx, f.Locals, f.Arity, f.VPos);
+    }
+  }
+
+  void dumpStack2(Runtime::StackManager& StackMgr, AST::InstrView::iterator PC) {
+    std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
+    std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
+    std::ofstream frame_fout("frame.img", std::ios::trunc | std::ios::binary);
+
+    // header file. frame stackのサイズを記録
+    uint32_t LenFrame = FrameStack.size();
+    frame_fout.write(reinterpret_cast<char *>(&LenFrame), sizeof(uint32_t));
+    frame_fout.close();
+    
+    // TypeStackからWAMRのセルの個数累積和みたいにする
+    // 累積和 1-indexed
+    std::vector<uint32_t> WamrCellSums(TypeStack.size()+1, 0);
+    for (uint32_t I = 0; I < TypeStack.size(); I++) {
+        WamrCellSums[I+1] = WamrCellSums[I] + (TypeStack[I] == 0 ? 1 : 2);
+    }
+
+    // uint32_t PreStackTop = FrameStack[0].VPos - FrameStack[0].Locals;
+    // フレームスタックを上から見ていく。上からstack1, stack2...とする
+    uint32_t StackIdx = 0;
+    uint32_t StackTop = StackMgr.size();
+    for (size_t I = LenFrame-1; I > 0; --I, ++StackIdx) {
+      std::ofstream ofs("stack" + std::to_string(StackIdx) + ".img", std::ios::trunc | std::ios::binary);
+      Runtime::StackManager::Frame f = FrameStack[I];
+ 
+      // ModuleInstance 
+      const Runtime::Instance::ModuleInstance* ModInst = f.Module;
+
+      // ModInstがnullの場合、ModNameだけ出力してcontinue
+      if (ModInst == nullptr) {
+        std::cerr << "ModInst is nullptr" << std::endl;
+        exit(1);
+      }
+
+      // 関数インデックス
+      // uint32_t EnterFuncIdx = getFuncIdx(f.EnterFunc);
+      uint32_t EnterFuncIdx = getFuncIdx(PC);
+      ofs.write(reinterpret_cast<char *>(&EnterFuncIdx), sizeof(uint32_t));
+
+      // リターンアドレス(uint32 fidx, uint32 offset)
+      auto [FuncIdx, Offset] = getInstrAddrExpr(ModInst, f.From);
+      ofs.write(reinterpret_cast<char *>(&FuncIdx), sizeof(uint32_t));
+      ofs.write(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
+
+      // 型スタック
+      uint32_t StackBottom = f.VPos - f.Locals;
+      uint32_t TspOfs = StackTop - StackBottom;
+      ofs.write(reinterpret_cast<char *>(&TspOfs), sizeof(uint32_t));
+      for (uint32_t I = StackBottom; I < StackTop; I++) {
+          ofs.write(reinterpret_cast<char *>(&TypeStack[I]), sizeof(uint8_t));
+      }
+
+      // 値スタック
+      std::vector<ValVariant> ValueStack = StackMgr.getValueStack();
+      for (uint32_t I = StackBottom; I < StackTop; I++) {
+        ofs.write(reinterpret_cast<char *>(&ValueStack[I].get<uint128_t>()), sizeof(uint32_t) * TypeStack[I]);
+      }
+
+      // ラベルスタック
+      auto Res = ModInst->getFunc(EnterFuncIdx);
+      if (!Res) {
+        std::cerr << "FuncIdx isn't correct" << std::endl; 
+        exit(1);
+      }
+      Runtime::Instance::FunctionInstance* FuncInst = Res.value();
+      std::vector<struct CtrlInfo> CtrlStack = getCtrlStack(PC, FuncInst, WamrCellSums);
+      uint32_t LenCs = CtrlStack.size();
+      ofs.write(reinterpret_cast<char *>(&LenCs), sizeof(uint32_t));
+      for (uint32_t I = 0; I < LenCs; I++) {
+        struct CtrlInfo ci = CtrlStack[I];
+        ofs.write(reinterpret_cast<char *>(&ci.BeginAddrOfs), sizeof(uint32_t));
+        ofs.write(reinterpret_cast<char *>(&ci.TargetAddrOfs), sizeof(uint32_t));
+        ofs.write(reinterpret_cast<char *>(&ci.SpOfs), sizeof(uint32_t));
+        ofs.write(reinterpret_cast<char *>(&ci.TspOfs), sizeof(uint32_t));
+        ofs.write(reinterpret_cast<char *>(&ci.ResultCells), sizeof(uint32_t));
+        ofs.write(reinterpret_cast<char *>(&ci.ResultCount), sizeof(uint32_t));
+      }
+
+      ofs.close();
+
+      // 各値を更新
+      PC = f.From;
+      StackTop = StackBottom;
 
       // debug
       debugFrame(I, EnterFuncIdx, f.Locals, f.Arity, f.VPos);
