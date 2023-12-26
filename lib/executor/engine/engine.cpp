@@ -63,7 +63,7 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
   }
 
   if (Res) {
-    if (Conf.getStatisticsConfigure().getDumpFlag() || Conf.getStatisticsConfigure().getRestoreFlag()) {
+    if (!Conf.getStatisticsConfigure().getDumpFlag() || Conf.getStatisticsConfigure().getRestoreFlag()) {
       Migr.preDumpIter(Func.getModule());
     }
 
@@ -81,9 +81,6 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
       std::cerr << "Restore memory" << std::endl;
       Migr.restoreGlobal(StackMgr.getModule());
       std::cerr << "Restore global" << std::endl;
-
-      // debug
-      Migr.dumpStack(StackMgr, StartIt);
 
       RestoreFlag = false;
     }
@@ -1907,7 +1904,8 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     }
 
     if (DumpFlag) {
-      if (Conf.getStatisticsConfigure().getDumpFlag()) {
+      // DumpFlag=1のとき、すなわち--no-snapshotオプションをつけたときダンプしない
+      if (!Conf.getStatisticsConfigure().getDumpFlag()) {
         // For WasmEdge
         Migr.dumpMemory(StackMgr.getModule());
         std::cerr << "Success dumpMemory" << std::endl;
