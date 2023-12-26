@@ -344,7 +344,7 @@ public:
       ofs.close();
 
       // debug
-      debugFrame(I, EnterFuncIdx, f.Locals, f.Arity, f.VPos);
+      // debugFrame(I, EnterFuncIdx, f.Locals, f.Arity, f.VPos);
     }
   }
 
@@ -367,7 +367,7 @@ public:
 
     // uint32_t PreStackTop = FrameStack[0].VPos - FrameStack[0].Locals;
     // フレームスタックを上から見ていく。上からstack1, stack2...とする
-    uint32_t StackIdx = 0;
+    uint32_t StackIdx = 1;
     uint32_t StackTop = StackMgr.size();
     for (size_t I = LenFrame-1; I > 0; --I, ++StackIdx) {
       std::ofstream ofs("stack" + std::to_string(StackIdx) + ".img", std::ios::trunc | std::ios::binary);
@@ -526,7 +526,7 @@ public:
     std::cerr << "frame stack size is " << StackMgr.getFrameStack().size() << std::endl;
     std::cerr << "[DEBUG]ValueStack size: " << StackMgr.size() << std::endl;
 
-    for (size_t I = 2; I < LenFrame; I++) {
+    for (size_t I = LenFrame-2; I > 0; --I) {
       ifs.open("stack" + std::to_string(I) + ".img", std::ios::binary);
 
       // 関数インデックスのロード
@@ -537,6 +537,12 @@ public:
       uint32_t FuncIdx, Offset;
       ifs.read(reinterpret_cast<char *>(&FuncIdx), sizeof(uint32_t));
       ifs.read(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
+      // リターンアドレスの復元
+      auto ResFrom = _restorePC(Module, FuncIdx, Offset);
+      if (!ResFrom) {
+        return Unexpect(ResFrom);
+      }
+      AST::InstrView::iterator From = ResFrom.value();
 
       // 型スタック
       uint32_t TspOfs;
@@ -557,14 +563,8 @@ public:
 
       // 最後のフレームは元のWasmEdgeフレームスタックには入ってないもの
       // 値スタックと型スタックのみ復元する
-      if (I == LenFrame-1) break;
+      // if (I == LenFrame-1) break;
 
-      // リターンアドレスの復元
-      auto ResFrom = _restorePC(Module, FuncIdx, Offset);
-      if (!ResFrom) {
-        return Unexpect(ResFrom);
-      }
-      AST::InstrView::iterator From = ResFrom.value();
 
       // ローカルと返り値の数
       auto ResFunc = Module->getFunc(EnterFuncIdx);
@@ -585,8 +585,9 @@ public:
       ifs.close();
 
       // debug
-      debugFrame(I, EnterFuncIdx, Locals, RetsN, VPos);
+      // debugFrame(I, EnterFuncIdx, Locals, RetsN, VPos);
     }
+    std::cerr << "FrameStack Size: " << StackMgr.getFrameStack().size() << std::endl;
     return {};
   }
 
