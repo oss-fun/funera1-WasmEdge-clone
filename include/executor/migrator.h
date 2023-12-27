@@ -117,9 +117,15 @@ public:
       auto Res = ModInst->getFunc(Data.FuncIdx);
       Runtime::Instance::FunctionInstance* FuncInst = Res.value();
       AST::InstrView::iterator PCStart = FuncInst->getInstrs().begin();
+      AST::InstrView::iterator PCEnd = FuncInst->getInstrs().end();
+      
+      // このif, elseの中身共通化できる
+      if (it+1 < PCEnd) it++;
+      Data = iterMigr[it];
       uint32_t Offset = it->getOffset() - PCStart->getOffset();
 
       return std::make_pair(Data.FuncIdx, Offset);
+
   }
 
   uint32_t getFuncIdx(const AST::InstrView::iterator PC) {
@@ -241,25 +247,26 @@ public:
   }
 
   Expect<void> dumpProgramCounter(const Runtime::Instance::ModuleInstance* ModInst, AST::InstrView::iterator Iter) {
-    IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
+    // IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
     // assert(IterMigrator);
 
-    struct SourceLoc Data = IterMigrator[Iter];
+    // struct SourceLoc Data = IterMigrator[Iter];
     std::ofstream ofs("program_counter.img", std::ios::trunc | std::ios::binary);
     if (!ofs) {
       return Unexpect(ErrCode::Value::IllegalPath);
     }
 
-    auto Res = ModInst->getFunc(Data.FuncIdx);
-    if (unlikely(!Res)) {
-      return Unexpect(Res);
-    }
-    Runtime::Instance::FunctionInstance* FuncInst = Res.value();
-    AST::InstrView::iterator PCStart = FuncInst->getInstrs().begin();
+    // auto Res = ModInst->getFunc(Data.FuncIdx);
+    // if (unlikely(!Res)) {
+    //   return Unexpect(Res);
+    // }
+    // Runtime::Instance::FunctionInstance* FuncInst = Res.value();
+    // AST::InstrView::iterator PCStart = FuncInst->getInstrs().begin();
 
 
-    uint32_t Offset = Iter->getOffset() - PCStart->getOffset();
-    ofs.write(reinterpret_cast<char *>(&Data.FuncIdx), sizeof(uint32_t));
+    auto [FuncIdx, Offset] = getInstrAddrExpr(ModInst, Iter);
+    // uint32_t Offset = Iter->getOffset() - PCStart->getOffset();
+    ofs.write(reinterpret_cast<char *>(&FuncIdx), sizeof(uint32_t));
     ofs.write(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
 
     ofs.close();
@@ -272,7 +279,7 @@ public:
     std::ofstream frame_fout("frame.img", std::ios::trunc | std::ios::binary);
 
     // header file. frame stackのサイズを記録
-    uint32_t LenFrame = FrameStack.size();
+    uint32_t LenFrame = FrameStack.size()-1;
     frame_fout.write(reinterpret_cast<char *>(&LenFrame), sizeof(uint32_t));
     frame_fout.close();
     
@@ -287,7 +294,7 @@ public:
     // フレームスタックを上から見ていく。上からstack1, stack2...とする
     uint32_t StackIdx = 1;
     uint32_t StackTop = StackMgr.size();
-    for (size_t I = LenFrame-1; I > 0; --I, ++StackIdx) {
+    for (size_t I = FrameStack.size()-1; I > 0; --I, ++StackIdx) {
       std::ofstream ofs("stack" + std::to_string(StackIdx) + ".img", std::ios::trunc | std::ios::binary);
       Runtime::StackManager::Frame f = FrameStack[I];
  
@@ -431,6 +438,7 @@ public:
     ifs.close();
 
     auto Res = _restorePC(ModInst, FuncIdx, Offset);
+    Res.value()--;
     return Res;
   }
 
@@ -442,7 +450,8 @@ public:
     ifs.read(reinterpret_cast<char *>(&LenFrame), sizeof(uint32_t));
     ifs.close();
 
-    for (size_t I = LenFrame-2; I > 0; --I) {
+    // LenFrame-1から始まるのは、Stack{LenFrame}.imgがダミーフレームだから
+    for (size_t I = LenFrame-1; I > 0; --I) {
       ifs.open("stack" + std::to_string(I) + ".img", std::ios::binary);
 
       // 関数インデックスのロード
@@ -458,7 +467,7 @@ public:
       if (!ResFrom) {
         return Unexpect(ResFrom);
       }
-      AST::InstrView::iterator From = ResFrom.value();
+      AST::InstrView::iterator From = ResFrom.value()-1;
 
       // ローカルと返り値の数
       auto ResFunc = Module->getFunc(EnterFuncIdx);
