@@ -117,15 +117,9 @@ public:
       auto Res = ModInst->getFunc(Data.FuncIdx);
       Runtime::Instance::FunctionInstance* FuncInst = Res.value();
       AST::InstrView::iterator PCStart = FuncInst->getInstrs().begin();
-      AST::InstrView::iterator PCEnd = FuncInst->getInstrs().end();
-      
-      // このif, elseの中身共通化できる
-      if (it+1 < PCEnd) it++;
-      Data = iterMigr[it];
       uint32_t Offset = it->getOffset() - PCStart->getOffset();
 
       return std::make_pair(Data.FuncIdx, Offset);
-
   }
 
   uint32_t getFuncIdx(const AST::InstrView::iterator PC) {
@@ -313,7 +307,10 @@ public:
       ofs.write(reinterpret_cast<char *>(&EnterFuncIdx), sizeof(uint32_t));
 
       // リターンアドレス(uint32 fidx, uint32 offset)
-      auto [FuncIdx, Offset] = getInstrAddrExpr(ModInst, f.From);
+      // NOTE: 共通仕様ではリターンアドレスは次に実行するアドレスなのでf.From+1
+      // I==1のときだけ, f.Fromにend()が入ってるので場合分け
+      AST::InstrView::iterator From = (I == 1 ? f.From : f.From+1);
+      auto [FuncIdx, Offset] = getInstrAddrExpr(ModInst, From);
       ofs.write(reinterpret_cast<char *>(&FuncIdx), sizeof(uint32_t));
       ofs.write(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
 
@@ -438,7 +435,6 @@ public:
     ifs.close();
 
     auto Res = _restorePC(ModInst, FuncIdx, Offset);
-    Res.value()--;
     return Res;
   }
 
