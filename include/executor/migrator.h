@@ -122,12 +122,17 @@ public:
       return std::make_pair(Data.FuncIdx, Offset);
   }
 
+  uint32_t getFuncIdx(const AST::InstrView::iterator PC) {
+    if (PC == nullptr) return -1;
+    struct SourceLoc Data = getSourceLoc(PC);
+    return Data.FuncIdx;
+  }
+
   // FunctioninstanceからFuncIdxを取得する
   uint32_t getFuncIdx(const Runtime::Instance::FunctionInstance* Func) {
     if (Func == nullptr) return -1;
     AST::InstrView::iterator PC = Func->getInstrs().begin();
-    struct SourceLoc Data = getSourceLoc(PC);
-    return Data.FuncIdx;
+    return getFuncIdx(PC);
   }
 
 
@@ -236,38 +241,39 @@ public:
   }
 
   Expect<void> dumpProgramCounter(const Runtime::Instance::ModuleInstance* ModInst, AST::InstrView::iterator Iter) {
-    IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
+    // IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
     // assert(IterMigrator);
 
-    struct SourceLoc Data = IterMigrator[Iter];
+    // struct SourceLoc Data = IterMigrator[Iter];
     std::ofstream ofs("program_counter.img", std::ios::trunc | std::ios::binary);
     if (!ofs) {
       return Unexpect(ErrCode::Value::IllegalPath);
     }
 
-    auto Res = ModInst->getFunc(Data.FuncIdx);
-    if (unlikely(!Res)) {
-      return Unexpect(Res);
-    }
-    Runtime::Instance::FunctionInstance* FuncInst = Res.value();
-    AST::InstrView::iterator PCStart = FuncInst->getInstrs().begin();
+    // auto Res = ModInst->getFunc(Data.FuncIdx);
+    // if (unlikely(!Res)) {
+    //   return Unexpect(Res);
+    // }
+    // Runtime::Instance::FunctionInstance* FuncInst = Res.value();
+    // AST::InstrView::iterator PCStart = FuncInst->getInstrs().begin();
 
 
-    uint32_t Offset = Iter->getOffset() - PCStart->getOffset();
-    ofs.write(reinterpret_cast<char *>(&Data.FuncIdx), sizeof(uint32_t));
+    auto [FuncIdx, Offset] = getInstrAddrExpr(ModInst, Iter);
+    // uint32_t Offset = Iter->getOffset() - PCStart->getOffset();
+    ofs.write(reinterpret_cast<char *>(&FuncIdx), sizeof(uint32_t));
     ofs.write(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
 
     ofs.close();
     return {};
   }
 
-  void dumpStack(Runtime::StackManager& StackMgr) {
+  void dumpStack(Runtime::StackManager& StackMgr, AST::InstrView::iterator PC) {
     std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
     std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
     std::ofstream frame_fout("frame.img", std::ios::trunc | std::ios::binary);
 
     // header file. frame stackのサイズを記録
-    uint32_t LenFrame = FrameStack.size();
+    uint32_t LenFrame = FrameStack.size()-1;
     frame_fout.write(reinterpret_cast<char *>(&LenFrame), sizeof(uint32_t));
     frame_fout.close();
     
@@ -278,13 +284,15 @@ public:
         WamrCellSums[I+1] = WamrCellSums[I] + (TypeStack[I] == 0 ? 1 : 2);
     }
 
-    std::map<std::string_view, bool> seenModInst;
-    uint32_t PreStackTop = FrameStack[0].VPos - FrameStack[0].Locals;
-    for (size_t I = 1; I < LenFrame; ++I) {
-      std::ofstream ofs("stack" + std::to_string(I) + ".img", std::ios::trunc | std::ios::binary);
+    // uint32_t PreStackTop = FrameStack[0].VPos - FrameStack[0].Locals;
+    // フレームスタックを上から見ていく。上からstack1, stack2...とする
+    uint32_t StackIdx = 1;
+    uint32_t StackTop = StackMgr.size();
+    for (size_t I = FrameStack.size()-1; I > 0; --I, ++StackIdx) {
+      std::ofstream ofs("stack" + std::to_string(StackIdx) + ".img", std::ios::trunc | std::ios::binary);
       Runtime::StackManager::Frame f = FrameStack[I];
-
-      // ModuleInstance
+ 
+      // ModuleInstance 
       const Runtime::Instance::ModuleInstance* ModInst = f.Module;
 
       // ModInstがnullの場合、ModNameだけ出力してcontinue
@@ -294,36 +302,40 @@ public:
       }
 
       // 関数インデックス
-      uint32_t EnterFuncIdx = getFuncIdx(f.EnterFunc);
+      // uint32_t EnterFuncIdx = getFuncIdx(f.EnterFunc);
+      uint32_t EnterFuncIdx = getFuncIdx(PC);
       ofs.write(reinterpret_cast<char *>(&EnterFuncIdx), sizeof(uint32_t));
 
       // リターンアドレス(uint32 fidx, uint32 offset)
-      auto [FuncIdx, Offset] = getInstrAddrExpr(ModInst, f.From);
+      // NOTE: 共通仕様ではリターンアドレスは次に実行するアドレスなのでf.From+1
+      // I==1のときだけ, f.Fromにend()が入ってるので場合分け
+      AST::InstrView::iterator From = (I == 1 ? f.From : f.From+1);
+      auto [FuncIdx, Offset] = getInstrAddrExpr(ModInst, From);
       ofs.write(reinterpret_cast<char *>(&FuncIdx), sizeof(uint32_t));
       ofs.write(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
 
       // 型スタック
-      uint32_t TspOfs = (f.VPos - f.Locals) - PreStackTop;
+      uint32_t StackBottom = f.VPos - f.Locals;
+      uint32_t TspOfs = StackTop - StackBottom;
       ofs.write(reinterpret_cast<char *>(&TspOfs), sizeof(uint32_t));
-      for (uint32_t I = PreStackTop; I < PreStackTop+TspOfs; I++) {
+      for (uint32_t I = StackBottom; I < StackTop; I++) {
           ofs.write(reinterpret_cast<char *>(&TypeStack[I]), sizeof(uint8_t));
       }
 
       // 値スタック
       std::vector<ValVariant> ValueStack = StackMgr.getValueStack();
-      for (uint32_t I = PreStackTop; I < PreStackTop+TspOfs; I++) {
+      for (uint32_t I = StackBottom; I < StackTop; I++) {
         ofs.write(reinterpret_cast<char *>(&ValueStack[I].get<uint128_t>()), sizeof(uint32_t) * TypeStack[I]);
       }
-      PreStackTop += TspOfs;
 
       // ラベルスタック
-      auto Res = ModInst->getFunc(FuncIdx);
+      auto Res = ModInst->getFunc(EnterFuncIdx);
       if (!Res) {
         std::cerr << "FuncIdx isn't correct" << std::endl; 
         exit(1);
       }
       Runtime::Instance::FunctionInstance* FuncInst = Res.value();
-      std::vector<struct CtrlInfo> CtrlStack = getCtrlStack(f.From, FuncInst, WamrCellSums);
+      std::vector<struct CtrlInfo> CtrlStack = getCtrlStack(PC, FuncInst, WamrCellSums);
       uint32_t LenCs = CtrlStack.size();
       ofs.write(reinterpret_cast<char *>(&LenCs), sizeof(uint32_t));
       for (uint32_t I = 0; I < LenCs; I++) {
@@ -338,8 +350,13 @@ public:
 
       ofs.close();
 
+      // 各値を更新
+      PC = f.From;
+      StackTop = StackBottom;
+      // std::cerr << "[DEBUG]StackTop is " << StackTop << std::endl;
+
       // debug
-      debugFrame(I, EnterFuncIdx, f.Locals, f.Arity, f.VPos);
+      // debugFrame(I, EnterFuncIdx, f.Locals, f.Arity, f.VPos);
     }
   }
   
@@ -429,10 +446,8 @@ public:
     ifs.read(reinterpret_cast<char *>(&LenFrame), sizeof(uint32_t));
     ifs.close();
 
-    std::cerr << "frame stack size is " << StackMgr.getFrameStack().size() << std::endl;
-    std::cerr << "[DEBUG]ValueStack size: " << StackMgr.size() << std::endl;
-
-    for (size_t I = 2; I < LenFrame; I++) {
+    // LenFrame-1から始まるのは、Stack{LenFrame}.imgがダミーフレームだから
+    for (size_t I = LenFrame-1; I > 0; --I) {
       ifs.open("stack" + std::to_string(I) + ".img", std::ios::binary);
 
       // 関数インデックスのロード
@@ -443,6 +458,29 @@ public:
       uint32_t FuncIdx, Offset;
       ifs.read(reinterpret_cast<char *>(&FuncIdx), sizeof(uint32_t));
       ifs.read(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
+      // リターンアドレスの復元
+      auto ResFrom = _restorePC(Module, FuncIdx, Offset);
+      if (!ResFrom) {
+        return Unexpect(ResFrom);
+      }
+      AST::InstrView::iterator From = ResFrom.value()-1;
+
+      // ローカルと返り値の数
+      auto ResFunc = Module->getFunc(EnterFuncIdx);
+      if (!ResFunc) {
+        return Unexpect(ResFunc);
+      }
+      const Runtime::Instance::FunctionInstance* Func = ResFunc.value();
+      const auto &FuncType = Func->getFuncType();
+      const uint32_t ArgsN = static_cast<uint32_t>(FuncType.getParamTypes().size());
+      const uint32_t RetsN =
+          static_cast<uint32_t>(FuncType.getReturnTypes().size());
+
+      // TODO: Localsに対応する値をenterFunctionと対応してるか確認する
+      uint32_t Locals = ArgsN + Func->getLocalNum();
+      uint32_t VPos = StackMgr.size() + Locals;
+
+      StackMgr._pushFrame(Module, From, Locals, RetsN, VPos, false);
 
       // 型スタック
       uint32_t TspOfs;
@@ -461,37 +499,10 @@ public:
         StackMgr.push(Value, TypeStack[I]);
       }
 
-      // 最後のフレームは元のWasmEdgeフレームスタックには入ってないもの
-      // 値スタックと型スタックのみ復元する
-      if (I == LenFrame-1) break;
-
-      // リターンアドレスの復元
-      auto ResFrom = _restorePC(Module, FuncIdx, Offset);
-      if (!ResFrom) {
-        return Unexpect(ResFrom);
-      }
-      AST::InstrView::iterator From = ResFrom.value();
-
-      // ローカルと返り値の数
-      auto ResFunc = Module->getFunc(EnterFuncIdx);
-      if (!ResFunc) {
-        return Unexpect(ResFunc);
-      }
-      const Runtime::Instance::FunctionInstance* Func = ResFunc.value();
-      const auto &FuncType = Func->getFuncType();
-      const uint32_t ArgsN = static_cast<uint32_t>(FuncType.getParamTypes().size());
-      const uint32_t RetsN =
-          static_cast<uint32_t>(FuncType.getReturnTypes().size());
-
-      // TODO: Localsに対応する値をenterFunctionと対応してるか確認する
-      uint32_t Locals = ArgsN + Func->getLocalNum();
-      uint32_t VPos = StackMgr.getValueStack().size() + Locals;
-
-      StackMgr._pushFrame(Module, From, Func, Locals, RetsN, VPos, false);
       ifs.close();
 
       // debug
-      debugFrame(I, EnterFuncIdx, Locals, RetsN, VPos);
+      // debugFrame(I, EnterFuncIdx, Locals, RetsN, VPos);
     }
     return {};
   }

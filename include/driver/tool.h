@@ -70,7 +70,7 @@ struct DriverToolOptions {
             "Enable generating code for all statistics options include instruction counting, gas measuring, and execution time"sv)),
         ConfForceInterpreter(
             PO::Description("Forcibly run WASM in interpreter mode."sv)),
-        DumpFlag(PO::Description("Snapshot statement to img files."sv)),
+        DumpFlag(PO::Description("Unsnapshot statement to img files."sv)),
         RestoreFlag(PO::Description("Restore statement by img files."sv)),
         TimeLim(
             PO::Description(
@@ -141,7 +141,7 @@ struct DriverToolOptions {
         .add_option("enable-extended-const"sv, PropExtendConst)
         .add_option("enable-threads"sv, PropThreads)
         .add_option("enable-all"sv, PropAll)
-        .add_option("snapshot"sv, DumpFlag)
+        .add_option("no-snapshot"sv, DumpFlag)
         .add_option("restore"sv, RestoreFlag)
         .add_option("debug-mode"sv, DebugMode)
         .add_option("time-limit"sv, TimeLim)

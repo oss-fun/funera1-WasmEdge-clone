@@ -63,7 +63,7 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
   }
 
   if (Res) {
-    if (Conf.getStatisticsConfigure().getDumpFlag() || Conf.getStatisticsConfigure().getRestoreFlag()) {
+    if (!Conf.getStatisticsConfigure().getDumpFlag() || Conf.getStatisticsConfigure().getRestoreFlag()) {
       Migr.preDumpIter(Func.getModule());
     }
 
@@ -81,6 +81,17 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
       std::cerr << "Restore memory" << std::endl;
       Migr.restoreGlobal(StackMgr.getModule());
       std::cerr << "Restore global" << std::endl;
+
+      // debug: wamrから取り込んだimageをリストアしてすぐdumpすると、同じものが出てくるはず
+      // Migr.dumpMemory(StackMgr.getModule());
+      // std::cerr << "Success dumpMemory" << std::endl;
+      // Migr.dumpGlobal(StackMgr.getModule());
+      // std::cerr << "Success dumpGlobal" << std::endl;
+      // Migr.dumpProgramCounter(StackMgr.getModule(), StartIt);
+      // std::cerr << "Success dumpIter" << std::endl;
+
+      // Migr.dumpStack(StackMgr, StartIt);
+      // std::cerr << "Success dumpStack" << std::endl;
 
       RestoreFlag = false;
     }
@@ -1904,7 +1915,8 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     }
 
     if (DumpFlag) {
-      if (Conf.getStatisticsConfigure().getDumpFlag()) {
+      // DumpFlag=1のとき、すなわち--no-snapshotオプションをつけたときダンプしない
+      if (!Conf.getStatisticsConfigure().getDumpFlag()) {
         // For WasmEdge
         Migr.dumpMemory(StackMgr.getModule());
         std::cerr << "Success dumpMemory" << std::endl;
@@ -1913,9 +1925,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
         Migr.dumpProgramCounter(StackMgr.getModule(), PC);
         std::cerr << "Success dumpIter" << std::endl;
 
-        StackMgr.pushFrame(StackMgr.getModule(), PC, 0, 0, false);
-        Migr.dumpStack(StackMgr);
-        StackMgr.popFrame();
+        Migr.dumpStack(StackMgr, PC);
         std::cerr << "Success dumpStack" << std::endl;
       }
       return {};
