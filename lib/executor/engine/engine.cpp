@@ -24,6 +24,13 @@ void signalHandler(int signum) {
   DumpFlag = true;
 }
 
+int64_t getTime(timespec ts1, timespec ts2) {
+  int64_t sec = ts2.tv_sec - ts1.tv_sec;
+  int64_t nsec = ts2.tv_nsec - ts1.tv_nsec;
+  // std::cerr << sec << ", " << nsec << std::endl;
+  return sec * 1e9 + nsec;
+}
+
 Expect<void> Executor::runExpression(Runtime::StackManager &StackMgr,
                                      AST::InstrView Instrs) {
   return execute(StackMgr, Instrs.begin(), Instrs.end());
@@ -1917,16 +1924,33 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     if (DumpFlag) {
       // DumpFlag=1のとき、すなわち--no-snapshotオプションをつけたときダンプしない
       if (!Conf.getStatisticsConfigure().getDumpFlag()) {
+        // struct timespec ts1, ts2, t_ts1, t_ts2;
+        struct timespec ts1, ts2;
+        // clock_gettime(CLOCK_MONOTONIC, &t_ts1);
         // For WasmEdge
+        clock_gettime(CLOCK_MONOTONIC, &ts1);
         Migr.dumpMemory(StackMgr.getModule());
-        std::cerr << "Success dumpMemory" << std::endl;
-        Migr.dumpGlobal(StackMgr.getModule());
-        std::cerr << "Success dumpGlobal" << std::endl;
-        Migr.dumpProgramCounter(StackMgr.getModule(), PC);
-        std::cerr << "Success dumpIter" << std::endl;
+        clock_gettime(CLOCK_MONOTONIC, &ts2);
+        std::cerr << "memory, " << getTime(ts1, ts2) << std::endl;
+        // std::cerr << "Success dumpMemory" << std::endl;
 
+        clock_gettime(CLOCK_MONOTONIC, &ts1);
+        Migr.dumpGlobal(StackMgr.getModule());
+        clock_gettime(CLOCK_MONOTONIC, &ts2);
+        std::cerr << "global, " << getTime(ts1, ts2) << std::endl;
+
+        // std::cerr << "Success dumpGlobal" << std::endl;
+        clock_gettime(CLOCK_MONOTONIC, &ts1);
+        Migr.dumpProgramCounter(StackMgr.getModule(), PC);
+        clock_gettime(CLOCK_MONOTONIC, &ts2);
+        std::cerr << "program counter, " << getTime(ts1, ts2) << std::endl;
+        // std::cerr << "Success dumpIter" << std::endl;
+
+        clock_gettime(CLOCK_MONOTONIC, &ts1);
         Migr.dumpStack(StackMgr, PC);
-        std::cerr << "Success dumpStack" << std::endl;
+        clock_gettime(CLOCK_MONOTONIC, &ts2);
+        std::cerr << "stack, " << getTime(ts1, ts2) << std::endl;
+        // std::cerr << "Success dumpStack" << std::endl;
       }
       return {};
     }
