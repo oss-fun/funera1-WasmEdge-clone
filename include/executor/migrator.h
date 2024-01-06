@@ -46,6 +46,13 @@ public:
     uint32_t ResultCount;
   };
 
+  struct IteratorKeys {
+    // すべての関数の先頭アドレスを照準に並べたリスト
+    std::vector<uintptr_t> AddrVec;
+    // 関数の先頭アドレス -> 関数インデックス
+    std::map<uintptr_t, uint32_t> AddrToIdx;
+  };
+
   /// ================
   /// Tools
   /// ================
@@ -59,39 +66,60 @@ public:
     return nullptr;
   }
 
+  // void setIterMigrator(const Runtime::Instance::ModuleInstance* ModInst) {
+  //   if (IterMigrators.count((std::string)ModInst->getModuleName())) {
+  //     return;
+  //   }
+
+  //   IterMigratorType IterMigrator;
+
+  //   uint64_t addr_cnt = 0;
+  //   for (uint32_t I = 0; I < ModInst->getFuncNum(); ++I) {
+  //     Runtime::Instance::FunctionInstance* FuncInst = ModInst->getFunc(I).value();
+  //     AST::InstrView Instr = FuncInst->getInstrs();
+  //     AST::InstrView::iterator PC = Instr.begin();
+  //     AST::InstrView::iterator PCEnd = Instr.end();
+
+  //     std::cerr << "Func[" << I << "]: [" << PC << ", " << PCEnd << "]" << std::endl; 
+  //     addr_cnt += PCEnd - PC;
+      
+  //     uint32_t Offset = 0;
+  //     while (PC != PCEnd) {
+  //       IterMigrator[PC] = SourceLoc{I, Offset};
+  //       Offset++;
+  //       PC++;
+  //     }
+  //   }
+  //   std::cerr << "Address Count: " << addr_cnt << std::endl; 
+
+  //   IterMigrators[(std::string)ModInst->getModuleName()] = IterMigrator;
+  // }
+
+  // void Prepare(const Runtime::Instance::ModuleInstance* ModInst) {
   void setIterMigrator(const Runtime::Instance::ModuleInstance* ModInst) {
-    if (IterMigrators.count((std::string)ModInst->getModuleName())) {
-      return;
-    }
-
-    IterMigratorType IterMigrator;
-
     for (uint32_t I = 0; I < ModInst->getFuncNum(); ++I) {
       Runtime::Instance::FunctionInstance* FuncInst = ModInst->getFunc(I).value();
       AST::InstrView Instr = FuncInst->getInstrs();
       AST::InstrView::iterator PC = Instr.begin();
-      AST::InstrView::iterator PCEnd = Instr.end();
-      
-      uint32_t Offset = 0;
-      while (PC != PCEnd) {
-        IterMigrator[PC] = SourceLoc{I, Offset};
-        Offset++;
-        PC++;
-      }
+      ik.AddrVec.push_back(uintptr_t(PC));
+      ik.AddrToIdx[uintptr_t(PC)] = I;
     }
+    // 門番
+    ik.AddrVec.push_back(UINT64_MAX);
 
-    IterMigrators[(std::string)ModInst->getModuleName()] = IterMigrator;
+    // 昇順ソート
+    std::sort(ik.AddrVec.begin(), ik.AddrVec.end());
   }
   
-  IterMigratorType getIterMigrator(const Runtime::Instance::ModuleInstance* ModInst) {
-    if (IterMigrators.count((std::string)ModInst->getModuleName())) {
-      return IterMigrators[(std::string)ModInst->getModuleName()];
-    }
+  // IterMigratorType getIterMigrator(const Runtime::Instance::ModuleInstance* ModInst) {
+  //   if (IterMigrators.count((std::string)ModInst->getModuleName())) {
+  //     return IterMigrators[(std::string)ModInst->getModuleName()];
+  //   }
 
-    std::string_view ModName = ModInst->getModuleName();
-    setIterMigrator(ModInst);
-    return IterMigrators[(std::string)ModName];
-  }
+  //   std::string_view ModName = ModInst->getModuleName();
+  //   setIterMigrator(ModInst);
+  //   return IterMigrators[(std::string)ModName];
+  // }
 
   IterMigratorType getIterMigratorByName(std::string ModName) {
     if (IterMigrators.count(ModName)) {
@@ -102,38 +130,51 @@ public:
     }
   }
 
-  SourceLoc getSourceLoc(AST::InstrView::iterator Iter) {
-    IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
-    // assert(IterMigrator);
+  // SourceLoc getSourceLoc(AST::InstrView::iterator Iter) {
+  //   IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
+  //   // assert(IterMigrator);
 
-    struct SourceLoc Data = IterMigrator[Iter];
-    return Data;
-  }
+  //   struct SourceLoc Data = IterMigrator[Iter];
+  //   return Data;
+  // }
   
   // 命令アドレスの状態表現 (fidx, offset)
-  std::pair<uint32_t, uint32_t> getInstrAddrExpr(const Runtime::Instance::ModuleInstance *ModInst, AST::InstrView::iterator it) {
-      IterMigratorType iterMigr = getIterMigratorByName(BaseModName);
-      struct SourceLoc Data = iterMigr[it];
-      auto Res = ModInst->getFunc(Data.FuncIdx);
-      Runtime::Instance::FunctionInstance* FuncInst = Res.value();
-      AST::InstrView::iterator PCStart = FuncInst->getInstrs().begin();
-      uint32_t Offset = it->getOffset() - PCStart->getOffset();
+  // std::pair<uint32_t, uint32_t> getInstrAddrExpr(const Runtime::Instance::ModuleInstance *ModInst, AST::InstrView::iterator it) {
+  //     IterMigratorType iterMigr = getIterMigratorByName(BaseModName);
+  //     struct SourceLoc Data = iterMigr[it];
+  //     auto Res = ModInst->getFunc(Data.FuncIdx);
+  //     Runtime::Instance::FunctionInstance* FuncInst = Res.value();
+  //     AST::InstrView::iterator PCStart = FuncInst->getInstrs().begin();
+  //     uint32_t Offset = it->getOffset() - PCStart->getOffset();
 
-      return std::make_pair(Data.FuncIdx, Offset);
-  }
-
+  //     return std::make_pair(Data.FuncIdx, Offset);
+  // }
   uint32_t getFuncIdx(const AST::InstrView::iterator PC) {
     if (PC == nullptr) return -1;
-    struct SourceLoc Data = getSourceLoc(PC);
-    return Data.FuncIdx;
+    
+    auto Ret = std::upper_bound(ik.AddrVec.begin(), ik.AddrVec.end(), uintptr_t(PC));
+    uintptr_t PCStart = *(Ret-1);
+    uint32_t FuncIdx = ik.AddrToIdx[PCStart];
+
+    return FuncIdx;
+  }
+
+  std::pair<uint32_t, uint32_t> getInstrAddrExpr(const Runtime::Instance::ModuleInstance *ModInst, AST::InstrView::iterator PC) {
+      uint32_t FuncIdx = getFuncIdx(PC);
+      if (FuncIdx == uint32_t(-1)) return std::make_pair(-1, -1);
+      Runtime::Instance::FunctionInstance* FuncInst = ModInst->getFunc(FuncIdx).value();
+      AST::InstrView::iterator PCStart = FuncInst->getInstrs().begin();
+      uint32_t Offset = PC->getOffset() - PCStart->getOffset();
+
+      return std::make_pair(FuncIdx, Offset);
   }
 
   // FunctioninstanceからFuncIdxを取得する
-  uint32_t getFuncIdx(const Runtime::Instance::FunctionInstance* Func) {
-    if (Func == nullptr) return -1;
-    AST::InstrView::iterator PC = Func->getInstrs().begin();
-    return getFuncIdx(PC);
-  }
+  // uint32_t getFuncIdx(const Runtime::Instance::FunctionInstance* Func) {
+  //   if (Func == nullptr) return -1;
+  //   AST::InstrView::iterator PC = Func->getInstrs().begin();
+  //   return getFuncIdx(PC);
+  // }
 
 
   /// ================
@@ -447,7 +488,8 @@ public:
     ifs.close();
 
     // LenFrame-1から始まるのは、Stack{LenFrame}.imgがダミーフレームだから
-    for (size_t I = LenFrame-1; I > 0; --I) {
+    AST::InstrView::iterator PC = StackMgr.popFrame();
+    for (size_t I = LenFrame; I > 0; --I) {
       ifs.open("stack" + std::to_string(I) + ".img", std::ios::binary);
 
       // 関数インデックスのロード
@@ -464,6 +506,7 @@ public:
         return Unexpect(ResFrom);
       }
       AST::InstrView::iterator From = ResFrom.value()-1;
+      if (I == LenFrame) From = PC; // 一番bottomのフレームのリターンアドレスはWasmEdge特有なので、それを使う
 
       // ローカルと返り値の数
       auto ResFunc = Module->getFunc(EnterFuncIdx);
@@ -516,6 +559,7 @@ private:
   std::string BaseModName;
   /// \name Module name mapping.
   std::map<std::string, const Runtime::Instance::ModuleInstance *, std::less<>> NamedMod;
+  IteratorKeys ik;
 };
 
 } // namespace Runtime
