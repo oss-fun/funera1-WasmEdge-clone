@@ -479,6 +479,53 @@ public:
     return Res;
   }
 
+  std::vector<uint8_t> getTypeStack(AST::InstrView::iterator PCStart, AST::InstrView::iterator PC) {
+    AST::InstrView::iterator Iter = PCStart;
+    std::vector<uint8_t> TypeStack;
+    TypeStack.reserve(2048U);
+
+    auto Dispatch = [this, &Iter, &TypeStack]() -> Expect<void> {
+      const AST::Instruction &Instr = *Iter;
+      switch (Instr.getOpCode()) {
+        // Control instructions.
+        case OpCode::Unreachable:
+          spdlog::error(ErrCode::Value::Unreachable);
+          spdlog::error(
+              ErrInfo::InfoInstruction(Instr.getOpCode(), Instr.getOffset()));
+          return Unexpect(ErrCode::Value::Unreachable);
+        case OpCode::Nop:
+          return {};
+        case OpCode::Block:
+          return {};
+        case OpCode::Loop:
+          return {};
+        case OpCode::If: {
+          TypeStack.pop_back();
+          return {};
+        }
+        case OpCode::Br:
+          return {};
+        case OpCode::Br_if: {
+          TypeStack.pop_back();
+          return {};
+        }
+        case OpCode::Br_table: {
+          TypeStack.pop_back();
+          return {};
+        }
+        case OpCode::Return: {
+          // 返り値をpush
+          return {};
+        }
+      }
+    };
+
+    while (Iter != PC) {
+      Dispatch();
+      Iter++; 
+    }
+  }
+
   Expect<void> restoreStack(Runtime::StackManager& StackMgr) {
     const Runtime::Instance::ModuleInstance *Module = StackMgr.getModule();
 
