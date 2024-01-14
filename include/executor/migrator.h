@@ -176,6 +176,77 @@ public:
   //   return getFuncIdx(PC);
   // }
 
+  std::vector<uint8_t> getTypeStack(uint32_t FuncIdx, uint32_t Offset, bool IsRetAddr) {
+    uint8_t Val;
+    std::ifstream type_table("type_table", std::ios::binary);
+    std::ifstream tablemap_func("tablemap_func", std::ios::binary);
+    std::ifstream tablemap_offset("tablemap_offset", std::ios::binary);
+
+    /// tablemap_func
+    uint32_t _FuncIdx;
+    uint64_t TablemapOffsetAddr;
+    tablemap_func.seekg(3*sizeof(uint32_t)*FuncIdx, std::ios_base::beg);
+    tablemap_func.read(reinterpret_cast<char *>(&_FuncIdx), sizeof(uint32_t));
+    tablemap_func.read(reinterpret_cast<char *>(&TablemapOffsetAddr), sizeof(uint64_t));
+
+    // もう使わないのでclose
+    tablemap_func.close();
+
+    /// tablemap_offset
+    std::vector<uint8_t> TypeStack(0);
+    uint32_t LocalsSize;
+    tablemap_offset.seekg(TablemapOffsetAddr, std::ios_base::beg);
+    // 関数FuncIdxのローカルを取得
+    tablemap_offset.read(reinterpret_cast<char *>(&LocalsSize), sizeof(uint32_t));
+    for (uint32_t I = 0; I < LocalsSize; ++I) {
+      tablemap_offset.read(reinterpret_cast<char *>(&Val), sizeof(uint8_t));
+      TypeStack.push_back(Val);
+    }
+    // Offsetの位置まで移動
+    uint32_t _Offset;
+    uint64_t TypeTableAddr;
+    // uint64_t PreTypeTableAddr;
+    while(1) {
+      tablemap_offset.read(reinterpret_cast<char *>(&_Offset), sizeof(uint32_t));
+      // eofならbreak
+      if (tablemap_offset.eof()) break;
+
+      tablemap_offset.read(reinterpret_cast<char *>(&TypeTableAddr), sizeof(uint64_t));
+      if (Offset == _Offset) break;
+      // PreTypeTableAddr = TypeTableAddr;
+    }
+    // リターンアドレスでない場合、そのアドレスはまだ実行していないので一個前のものを返す
+    // if (!IsRetAddr) TypeTableAddr = PreTypeTableAddr;
+    // もう使わないのでclose
+    tablemap_offset.close();
+
+    /// type_table
+    type_table.seekg(TypeTableAddr, std::ios_base::beg);
+    uint32_t StackSize;
+    type_table.read(reinterpret_cast<char *>(&StackSize), sizeof(uint32_t));
+    // リターンアドレスの場合、つまり関数呼び出し途中のとき用のスタックを取得する
+    if (IsRetAddr) {
+      type_table.seekg(StackSize, std::ios_base::cur);
+      type_table.read(reinterpret_cast<char *>(&StackSize), sizeof(uint32_t));
+    }
+    for (uint32_t I = 0; I < StackSize; ++I) {
+      type_table.read(reinterpret_cast<char *>(&Val), sizeof(uint8_t));
+      TypeStack.push_back(Val);
+    }
+    // close
+    type_table.close();
+
+    // debug
+    if (!IsRetAddr) {
+      std::cerr << "[DEBUG]LocalsSize: " << LocalsSize << std::endl;
+      std::cerr << "[DEBUG]StackSize: " << StackSize << std::endl;
+    }
+    // std::cerr << "[DEBUG]LocalsSize: " << LocalsSize << std::endl;
+    // std::cerr << "[DEBUG]StackSize: " << StackSize << std::endl;
+
+    return TypeStack;
+  }
+
 
   /// ================
   /// Debug
@@ -362,6 +433,27 @@ public:
       for (uint32_t I = StackBottom; I < StackTop; I++) {
           ofs.write(reinterpret_cast<char *>(&TypeStack[I]), sizeof(uint8_t));
       }
+      auto [NowFuncIdx, NowOffset] = (I == FrameStack.size()-1 
+                                      ?getInstrAddrExpr(ModInst, PC)
+                                      :getInstrAddrExpr(ModInst, PC+1));
+      std::cerr << "(FuncIdx, Offset): (" << NowFuncIdx << ", " << NowOffset << ")" << std::endl;
+      std::vector<uint8_t> TypeStackFromFile = getTypeStack(NowFuncIdx, NowOffset, (I!=FrameStack.size()-1));
+
+      // NOTE: ファイルで取得したものが正しいかチェック
+      if (TspOfs != TypeStackFromFile.size()) std::cerr << "型スタックのサイズが違う. " << TspOfs << "!=" << TypeStackFromFile.size() << std::endl;
+      for (uint32_t I = 0; I < TypeStackFromFile.size(); ++I) {
+        if (TypeStack[StackBottom+I] != TypeStackFromFile[I]) {
+          std::cerr << "型スタックの中身が違う. " << std::endl;
+          break;
+        }
+      }
+      // std::cerr << "TypeStack: [";
+      // for (auto t : TypeStackFromFile) std::cerr << +t << ", ";
+      // std::cerr << "]" << std::endl;
+      
+      // for (uint32_t I = 0; I < TypeStackFromFile.size(); ++I) {
+      //     ofs.write(reinterpret_cast<char *>(&TypeStackFromFile[I]), sizeof(uint8_t));
+      // }
 
       // 値スタック
       std::vector<ValVariant> ValueStack = StackMgr.getValueStack();
