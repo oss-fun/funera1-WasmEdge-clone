@@ -237,10 +237,6 @@ public:
     type_table.close();
 
     // debug
-    if (!IsRetAddr) {
-      std::cerr << "[DEBUG]LocalsSize: " << LocalsSize << std::endl;
-      std::cerr << "[DEBUG]StackSize: " << StackSize << std::endl;
-    }
     // std::cerr << "[DEBUG]LocalsSize: " << LocalsSize << std::endl;
     // std::cerr << "[DEBUG]StackSize: " << StackSize << std::endl;
 
@@ -402,7 +398,7 @@ public:
     uint32_t StackTop = StackMgr.size();
     bool IsRetAddr;
     for (size_t I = FrameStack.size()-1; I > 0; --I, ++StackIdx) {
-      IsRetAddr = (I != FrameStack.size()-1);
+      IsRetAddr = (bool)(I != FrameStack.size()-1);
       std::ofstream ofs("stack" + std::to_string(StackIdx) + ".img", std::ios::trunc | std::ios::binary);
       Runtime::StackManager::Frame f = FrameStack[I];
  
@@ -440,8 +436,8 @@ public:
       // Op::Call <- 本来実行しているアドレス
       // Op::fuga 
       auto [NowFuncIdx, NowOffset] = (IsRetAddr 
-                                      ?getInstrAddrExpr(ModInst, PC)
-                                      :getInstrAddrExpr(ModInst, PC+1));
+                                      ?getInstrAddrExpr(ModInst, PC+1)
+                                      :getInstrAddrExpr(ModInst, PC));
       std::cerr << "(FuncIdx, Offset): (" << NowFuncIdx << ", " << NowOffset << ")" << std::endl;
       std::vector<uint8_t> TypeStackFromFile = getTypeStack(NowFuncIdx, NowOffset, IsRetAddr);
 
