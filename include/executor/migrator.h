@@ -377,7 +377,6 @@ public:
 
   void dumpStack(Runtime::StackManager& StackMgr, AST::InstrView::iterator PC) {
     std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
-    std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
     std::ofstream frame_fout("frame.img", std::ios::trunc | std::ios::binary);
 
     // header file. frame stackのサイズを記録
@@ -385,11 +384,31 @@ public:
     frame_fout.write(reinterpret_cast<char *>(&LenFrame), sizeof(uint32_t));
     frame_fout.close();
     
+    // 先にフレームごとの命令アドレスを持っておく
+    // FramePCsはトップのフレームがボトムにくるようにしてある。（つまりスタック形式で扱う)
+    // FramePCsはWamrCellSumsを計算するためだけに利用.
+    std::vector<std::pair<uint32_t, uint32_t>> FramePCs(0);
+    AST::InstrView::iterator PCCopy = PC;
+    for (size_t I = FrameStack.size()-1; I > 0; --I) {
+      auto f = FrameStack[I];
+      const Runtime::Instance::ModuleInstance* ModInst = f.Module;
+      if (I == FrameStack.size()-1) FramePCs.push_back(getInstrAddrExpr(ModInst, PC));
+      else                          FramePCs.push_back(getInstrAddrExpr(ModInst, PC+1));
+      PC = (I == 1 ? f.From : f.From+1);
+    }
+    PC = PCCopy;
+
     // TypeStackからWAMRのセルの個数累積和みたいにする
     // 累積和 1-indexed
-    std::vector<uint32_t> WamrCellSums(TypeStack.size()+1, 0);
-    for (uint32_t I = 0; I < TypeStack.size(); I++) {
-        WamrCellSums[I+1] = WamrCellSums[I] + (TypeStack[I] == 0 ? 1 : 2);
+    std::vector<uint32_t> WamrCellSums(StackMgr.size()+1, 0);
+    while(!FramePCs.empty()) {
+      auto [FuncIdx, Offset] = FramePCs.back();
+      FramePCs.pop_back();
+      std::vector<uint8_t> TypeStack = getTypeStack(FuncIdx, Offset, FramePCs.empty());
+
+      for (uint32_t I = 0; I < TypeStack.size(); I++) {
+          WamrCellSums[I+1] = WamrCellSums[I] + TypeStack[I];
+      }
     }
 
     // uint32_t PreStackTop = FrameStack[0].VPos - FrameStack[0].Locals;
@@ -426,11 +445,6 @@ public:
 
       // 型スタック
       uint32_t StackBottom = f.VPos - f.Locals;
-      uint32_t TspOfs = StackTop - StackBottom;
-      ofs.write(reinterpret_cast<char *>(&TspOfs), sizeof(uint32_t));
-      for (uint32_t I = StackBottom; I < StackTop; I++) {
-          ofs.write(reinterpret_cast<char *>(&TypeStack[I]), sizeof(uint8_t));
-      }
       // リターンアドレスは1個前のところを保存しているので、+1する
       // Op::hoge <- 実際持ってるアドレス
       // Op::Call <- 本来実行しているアドレス
@@ -439,24 +453,19 @@ public:
                                       ?getInstrAddrExpr(ModInst, PC+1)
                                       :getInstrAddrExpr(ModInst, PC));
       std::cerr << "(FuncIdx, Offset): (" << NowFuncIdx << ", " << NowOffset << ")" << std::endl;
-      std::vector<uint8_t> TypeStackFromFile = getTypeStack(NowFuncIdx, NowOffset, IsRetAddr);
-
-      // NOTE: ファイルで取得したものが正しいかチェック
-      if (TspOfs != TypeStackFromFile.size()) std::cerr << "型スタックのサイズが違う. " << TspOfs << "!=" << TypeStackFromFile.size() << std::endl;
-      for (uint32_t I = 0; I < TypeStackFromFile.size(); ++I) {
-        if (TypeStack[StackBottom+I] != TypeStackFromFile[I]) {
-          std::cerr << "型スタックの中身が違う. " << std::endl;
-          break;
-        }
+      std::vector<uint8_t> TypeStack = getTypeStack(NowFuncIdx, NowOffset, IsRetAddr);
+      uint32_t TypeStackLen = TypeStack.size();
+      ofs.write(reinterpret_cast<char *>(&TypeStackLen), sizeof(uint32_t));
+      // TODO: forで回す必要ないか調べる
+      for (uint32_t I = 0; I < TypeStack.size(); ++I) {
+          ofs.write(reinterpret_cast<char *>(&TypeStack[I]), sizeof(uint8_t));
       }
-      // for (uint32_t I = 0; I < TypeStackFromFile.size(); ++I) {
-      //     ofs.write(reinterpret_cast<char *>(&TypeStackFromFile[I]), sizeof(uint8_t));
-      // }
 
       // 値スタック
       std::vector<ValVariant> ValueStack = StackMgr.getValueStack();
-      for (uint32_t I = StackBottom; I < StackTop; I++) {
-        ofs.write(reinterpret_cast<char *>(&ValueStack[I].get<uint128_t>()), sizeof(uint32_t) * TypeStack[I]);
+      // for (uint32_t I = StackBottom; I < StackTop; I++) {
+      for (uint32_t I = 0; I < TypeStackLen; I++) {
+        ofs.write(reinterpret_cast<char *>(&ValueStack[StackBottom+I].get<uint128_t>()), sizeof(uint32_t) * TypeStack[I]);
       }
 
       // ラベルスタック
@@ -484,7 +493,7 @@ public:
       // 各値を更新
       PC = f.From;
       StackTop = StackBottom;
-      // std::cerr << "[DEBUG]StackTop is " << StackTop << std::endl;
+      std::cerr << "[DEBUG]StackTop is " << StackTop << std::endl;
 
       // debug
       // debugFrame(I, EnterFuncIdx, f.Locals, f.Arity, f.VPos);
