@@ -483,9 +483,7 @@ public:
         ofs.write(reinterpret_cast<char *>(&ci.BeginAddrOfs), sizeof(uint32_t));
         ofs.write(reinterpret_cast<char *>(&ci.TargetAddrOfs), sizeof(uint32_t));
         ofs.write(reinterpret_cast<char *>(&ci.SpOfs), sizeof(uint32_t));
-        ofs.write(reinterpret_cast<char *>(&ci.TspOfs), sizeof(uint32_t));
         ofs.write(reinterpret_cast<char *>(&ci.ResultCells), sizeof(uint32_t));
-        ofs.write(reinterpret_cast<char *>(&ci.ResultCount), sizeof(uint32_t));
       }
 
       ofs.close();
