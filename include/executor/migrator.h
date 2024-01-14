@@ -400,7 +400,9 @@ public:
     // フレームスタックを上から見ていく。上からstack1, stack2...とする
     uint32_t StackIdx = 1;
     uint32_t StackTop = StackMgr.size();
+    bool IsRetAddr;
     for (size_t I = FrameStack.size()-1; I > 0; --I, ++StackIdx) {
+      IsRetAddr = (I != FrameStack.size()-1);
       std::ofstream ofs("stack" + std::to_string(StackIdx) + ".img", std::ios::trunc | std::ios::binary);
       Runtime::StackManager::Frame f = FrameStack[I];
  
@@ -433,11 +435,15 @@ public:
       for (uint32_t I = StackBottom; I < StackTop; I++) {
           ofs.write(reinterpret_cast<char *>(&TypeStack[I]), sizeof(uint8_t));
       }
-      auto [NowFuncIdx, NowOffset] = (I == FrameStack.size()-1 
+      // リターンアドレスは1個前のところを保存しているので、+1する
+      // Op::hoge <- 実際持ってるアドレス
+      // Op::Call <- 本来実行しているアドレス
+      // Op::fuga 
+      auto [NowFuncIdx, NowOffset] = (IsRetAddr 
                                       ?getInstrAddrExpr(ModInst, PC)
                                       :getInstrAddrExpr(ModInst, PC+1));
       std::cerr << "(FuncIdx, Offset): (" << NowFuncIdx << ", " << NowOffset << ")" << std::endl;
-      std::vector<uint8_t> TypeStackFromFile = getTypeStack(NowFuncIdx, NowOffset, (I!=FrameStack.size()-1));
+      std::vector<uint8_t> TypeStackFromFile = getTypeStack(NowFuncIdx, NowOffset, IsRetAddr);
 
       // NOTE: ファイルで取得したものが正しいかチェック
       if (TspOfs != TypeStackFromFile.size()) std::cerr << "型スタックのサイズが違う. " << TspOfs << "!=" << TypeStackFromFile.size() << std::endl;
@@ -447,10 +453,6 @@ public:
           break;
         }
       }
-      // std::cerr << "TypeStack: [";
-      // for (auto t : TypeStackFromFile) std::cerr << +t << ", ";
-      // std::cerr << "]" << std::endl;
-      
       // for (uint32_t I = 0; I < TypeStackFromFile.size(); ++I) {
       //     ofs.write(reinterpret_cast<char *>(&TypeStackFromFile[I]), sizeof(uint8_t));
       // }
