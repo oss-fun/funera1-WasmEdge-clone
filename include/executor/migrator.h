@@ -636,7 +636,7 @@ public:
       for (uint32_t I = 0; I < TspOfs; I++) {
         ValVariant Value;
         ifs.read(reinterpret_cast<char *>(&Value), sizeof(uint32_t) * TypeStack[I]);
-        StackMgr.push(Value, TypeStack[I]);
+        StackMgr.push(Value);
       }
 
       ifs.close();
