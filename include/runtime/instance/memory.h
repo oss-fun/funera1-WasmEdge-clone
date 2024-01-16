@@ -19,6 +19,7 @@
 #include "common/log.h"
 #include "system/allocator.h"
 
+#include <unistd.h>
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
@@ -357,6 +358,64 @@ public:
     fout.close();
     return {};
   }
+
+  bool IsDirtyPage(uint64_t PageMapEntry) {
+    return (PageMapEntry >> 62 & 1) | (PageMapEntry >> 63 & 1);
+  }
+
+  Expect<int> dumpDirtyMemory(Span<Byte> &Data, std::ofstream &ofs) {
+    const uint32_t PAGEMAP_LENGTH = 8;
+    const uint32_t PAGE_SIZE = 4096;
+
+    // プロセスのpagemapを開く
+    FILE* fd = fopen("/proc/self/pagemap", "rb");
+    if (fd == NULL) {
+        perror("Error opening pagemap");
+        return -1;
+    }
+
+    // TODO: これいらん
+    // uint64_t pfn = (uint64_t)Data.data() / PAGE_SIZE;
+    // off64_t offset = sizeof(uint64_t) * pfn;
+    // if (fseek(fd, offset, SEEK_SET) == -1) {
+    //     perror("[ERROR]Failed seeking to pagemap entry");
+    //     fclose(fd);
+    //     return -1;
+    // }
+
+    uint8_t* BegAddr = Data.data();
+    uint8_t* EndAddr = BegAddr + Data.size();
+    uint32_t I = 0;
+    uint64_t PageMapEntry;
+    for (uint8_t* Addr = BegAddr; Addr < EndAddr; Addr += PAGE_SIZE, ++I) {
+      uint64_t pfn = (uint64_t)Addr / PAGE_SIZE;
+      off64_t offset = sizeof(uint64_t) * pfn;
+
+      if (fseek(fd, offset, SEEK_SET) == -1) {
+          perror("[ERROR]Failed seeking to pagemap entry");
+          fclose(fd);
+          return -1;
+      }
+
+      uint32_t read_size = fread(&PageMapEntry, PAGEMAP_LENGTH, 1, fd);
+      if (read_size == 0) {
+      // if (fread(&PageMapEntry, PAGEMAP_LENGTH, 1, fd) != PAGEMAP_LENGTH) {
+          perror("[ERROR]Failed reading pagemap entry");
+          std::cerr << "[ERROR]read_size: " << read_size << std::endl;
+          std::cerr << "[ERROR]PageMapEntry: " << PageMapEntry << std::endl;
+          fclose(fd);
+          return -1;
+      }
+
+      if (IsDirtyPage(PageMapEntry)) {
+        uint32_t offset = Addr - BegAddr;
+        std::cerr << "[DEBUG]dirty page: " << offset << std::endl;
+        ofs.write(reinterpret_cast<char *>(&offset), sizeof(uint32_t));
+        ofs.write(reinterpret_cast<char *>(Addr), PAGE_SIZE);
+      }
+    }
+    return 0;
+  }
   
   Expect<void> dumpDataPtr(std::string filename) {
     // Open file
@@ -373,8 +432,16 @@ public:
       return Unexpect(Res);
     }
     Span<Byte> Data = Res.value();
-    ofs.write(reinterpret_cast<char*>(Data.data()), Data.size());
+    dumpDirtyMemory(Data, ofs);
     ofs.close();
+
+    // デバッグのために全部吐き出すやつもやる
+    std::ofstream ofs2("all_memory.img", std::ios::trunc | std::ios::binary);
+    if (!ofs2) {
+      return Unexpect(ErrCode::Value::IllegalPath);
+    }
+    ofs2.write(reinterpret_cast<char*>(Data.data()), Data.size());
+    ofs2.close();
     return {};
   }
   
@@ -401,13 +468,14 @@ public:
     }
     
     // Restore DataPtr
-    uint32_t ByteSize = MemType.getLimit().getMin() * kPageSize;
-    if (auto Res = restoreDataPtr(filename)) {
-      std::vector<uint8_t> v = Res.value();
-      // TODO: setBytesをする際のgrowPageの兼ね合いとかどうなってるか確認する
-      if (auto Res = setBytes(Span<uint8_t>(v), 0, 0, ByteSize); !Res){
-        return Unexpect(Res);
-      }
+    if (auto Res = restoreDirtyMemory(filename)) {
+    // uint32_t ByteSize = MemType.getLimit().getMin() * kPageSize;
+    // if (auto Res = restoreDataPtr(filename)) {
+    //   std::vector<uint8_t> v = Res.value();
+    //   // TODO: setBytesをする際のgrowPageの兼ね合いとかどうなってるか確認する
+    //   if (auto Res = setBytes(Span<uint8_t>(v), 0, 0, ByteSize); !Res){
+    //     return Unexpect(Res);
+    //   }
     }
     else {
       return Unexpect(Res);
@@ -429,6 +497,32 @@ public:
     ifs.close();
 
     return mem_page_count;
+  }
+
+  Expect<void> restoreDirtyMemory(std::string filename) {
+    filename = filename + "memory.img";
+    std::ifstream ifs(filename, std::ios::binary);
+    if (!ifs) {
+      return Unexpect(ErrCode::Value::IllegalPath);
+    }
+
+    const uint32_t PAGE_SIZE = 4096;
+    std::vector<uint8_t> memory(PAGE_SIZE);
+    uint32_t offset;
+    while (1) {
+      ifs.read(reinterpret_cast<char *>(&offset), sizeof(uint32_t));
+      std::cerr << "[DEBUG]restore page: " << offset << std::endl;
+
+      ifs.read(reinterpret_cast<char *>(memory.data()), PAGE_SIZE);
+      if (auto Res = setBytes(Span<Byte>(memory), offset, 0, PAGE_SIZE); !Res) {
+        return Unexpect(Res);
+      } 
+
+      if (ifs.eof()) break;
+    }
+
+    ifs.close();
+    return {};
   }
   
   Expect<std::vector<uint8_t>> restoreDataPtr(std::string filename) {
