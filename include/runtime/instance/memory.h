@@ -368,8 +368,8 @@ public:
     const uint32_t PAGE_SIZE = 4096;
 
     // プロセスのpagemapを開く
-    FILE* fd = fopen("/proc/self/pagemap", "rb");
-    if (fd == NULL) {
+    FILE* PageMap = fopen("/proc/self/pagemap", "rb");
+    if (PageMap == NULL) {
         perror("Error opening pagemap");
         return -1;
     }
@@ -379,24 +379,23 @@ public:
     uint64_t PageMapEntry;
     for (uint8_t* Addr = BegAddr; Addr < EndAddr; Addr += PAGE_SIZE) {
       uint64_t pfn = (uint64_t)Addr / PAGE_SIZE;
-      off64_t offset = sizeof(uint64_t) * pfn;
+      off64_t Offset = sizeof(uint64_t) * pfn;
 
-      if (fseek(fd, offset, SEEK_SET) == -1) {
+      if (fseek(PageMap, Offset, SEEK_SET) == -1) {
           perror("[ERROR]Failed seeking to pagemap entry");
-          fclose(fd);
+          fclose(PageMap);
           return -1;
       }
 
-      uint32_t read_size = fread(&PageMapEntry, PAGEMAP_LENGTH, 1, fd);
-      if (fread(&PageMapEntry, PAGEMAP_LENGTH, 1, fd) == 0) {
+      if (fread(&PageMapEntry, PAGEMAP_LENGTH, 1, PageMap) == 0) {
           perror("[ERROR]Failed reading pagemap entry");
-          fclose(fd);
+          fclose(PageMap);
           return -1;
       }
 
       if (IsDirtyPage(PageMapEntry)) {
-        uint32_t offset = Addr - BegAddr;
-        ofs.write(reinterpret_cast<char *>(&offset), sizeof(uint32_t));
+        uint32_t MemInstAddr = Addr - BegAddr;
+        ofs.write(reinterpret_cast<char *>(&MemInstAddr), sizeof(uint32_t));
         ofs.write(reinterpret_cast<char *>(Addr), PAGE_SIZE);
       }
     }
@@ -486,17 +485,16 @@ public:
 
     const uint32_t PAGE_SIZE = 4096;
     std::vector<uint8_t> memory(PAGE_SIZE);
-    uint32_t offset;
+    uint32_t MemInstAddr;
     while (1) {
-      ifs.read(reinterpret_cast<char *>(&offset), sizeof(uint32_t));
+      ifs.read(reinterpret_cast<char *>(&MemInstAddr), sizeof(uint32_t));
       if (ifs.eof()) break;
       // std::cerr << "[DEBUG]restore page: " << offset << std::endl;
 
       ifs.read(reinterpret_cast<char *>(memory.data()), PAGE_SIZE);
-      if (auto Res = setBytes(Span<Byte>(memory), offset, 0, PAGE_SIZE); !Res) {
+      if (auto Res = setBytes(Span<Byte>(memory), MemInstAddr, 0, PAGE_SIZE); !Res) {
         return Unexpect(Res);
       } 
-
     }
 
     ifs.close();
