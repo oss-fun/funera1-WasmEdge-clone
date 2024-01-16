@@ -374,20 +374,10 @@ public:
         return -1;
     }
 
-    // TODO: これいらん
-    // uint64_t pfn = (uint64_t)Data.data() / PAGE_SIZE;
-    // off64_t offset = sizeof(uint64_t) * pfn;
-    // if (fseek(fd, offset, SEEK_SET) == -1) {
-    //     perror("[ERROR]Failed seeking to pagemap entry");
-    //     fclose(fd);
-    //     return -1;
-    // }
-
     uint8_t* BegAddr = Data.data();
     uint8_t* EndAddr = BegAddr + Data.size();
-    uint32_t I = 0;
     uint64_t PageMapEntry;
-    for (uint8_t* Addr = BegAddr; Addr < EndAddr; Addr += PAGE_SIZE, ++I) {
+    for (uint8_t* Addr = BegAddr; Addr < EndAddr; Addr += PAGE_SIZE) {
       uint64_t pfn = (uint64_t)Addr / PAGE_SIZE;
       off64_t offset = sizeof(uint64_t) * pfn;
 
@@ -398,18 +388,14 @@ public:
       }
 
       uint32_t read_size = fread(&PageMapEntry, PAGEMAP_LENGTH, 1, fd);
-      if (read_size == 0) {
-      // if (fread(&PageMapEntry, PAGEMAP_LENGTH, 1, fd) != PAGEMAP_LENGTH) {
+      if (fread(&PageMapEntry, PAGEMAP_LENGTH, 1, fd) == 0) {
           perror("[ERROR]Failed reading pagemap entry");
-          std::cerr << "[ERROR]read_size: " << read_size << std::endl;
-          std::cerr << "[ERROR]PageMapEntry: " << PageMapEntry << std::endl;
           fclose(fd);
           return -1;
       }
 
       if (IsDirtyPage(PageMapEntry)) {
         uint32_t offset = Addr - BegAddr;
-        std::cerr << "[DEBUG]dirty page: " << offset << std::endl;
         ofs.write(reinterpret_cast<char *>(&offset), sizeof(uint32_t));
         ofs.write(reinterpret_cast<char *>(Addr), PAGE_SIZE);
       }
@@ -468,18 +454,10 @@ public:
     }
     
     // Restore DataPtr
-    if (auto Res = restoreDirtyMemory(filename)) {
-    // uint32_t ByteSize = MemType.getLimit().getMin() * kPageSize;
-    // if (auto Res = restoreDataPtr(filename)) {
-    //   std::vector<uint8_t> v = Res.value();
-    //   // TODO: setBytesをする際のgrowPageの兼ね合いとかどうなってるか確認する
-    //   if (auto Res = setBytes(Span<uint8_t>(v), 0, 0, ByteSize); !Res){
-    //     return Unexpect(Res);
-    //   }
-    }
-    else {
+    if (auto Res = restoreDirtyMemory(filename); !Res) {
       return Unexpect(Res);
     }
+
     return {};
   }
   
@@ -511,14 +489,14 @@ public:
     uint32_t offset;
     while (1) {
       ifs.read(reinterpret_cast<char *>(&offset), sizeof(uint32_t));
-      std::cerr << "[DEBUG]restore page: " << offset << std::endl;
+      if (ifs.eof()) break;
+      // std::cerr << "[DEBUG]restore page: " << offset << std::endl;
 
       ifs.read(reinterpret_cast<char *>(memory.data()), PAGE_SIZE);
       if (auto Res = setBytes(Span<Byte>(memory), offset, 0, PAGE_SIZE); !Res) {
         return Unexpect(Res);
       } 
 
-      if (ifs.eof()) break;
     }
 
     ifs.close();
@@ -527,7 +505,7 @@ public:
   
   Expect<std::vector<uint8_t>> restoreDataPtr(std::string filename) {
     // filename = filename + "_dataptr.img";
-    filename = filename + "memory.img";
+    filename = filename + "all_memory.img";
     std::ifstream ifs(filename, std::ios::binary);
     if (!ifs) {
       return Unexpect(ErrCode::Value::IllegalPath);
