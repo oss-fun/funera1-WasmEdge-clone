@@ -363,6 +363,10 @@ public:
     return (PageMapEntry >> 62 & 1) | (PageMapEntry >> 63 & 1);
   }
 
+  bool IsSoftDirtyPage(uint64_t PageMapEntry) {
+    return (PageMapEntry >> 55 & 1);
+  }
+
   Expect<int> dumpDirtyMemory(Span<Byte> &Data, std::ofstream &ofs) {
     const uint32_t PAGEMAP_LENGTH = 8;
     const uint32_t PAGE_SIZE = 4096;
@@ -393,7 +397,7 @@ public:
           return -1;
       }
 
-      if (IsDirtyPage(PageMapEntry)) {
+      if (IsSoftDirtyPage(PageMapEntry)) {
         uint32_t MemInstAddr = Addr - BegAddr;
         ofs.write(reinterpret_cast<char *>(&MemInstAddr), sizeof(uint32_t));
         ofs.write(reinterpret_cast<char *>(Addr), PAGE_SIZE);

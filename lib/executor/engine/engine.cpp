@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstring>
 #include <signal.h>
+#include <fcntl.h>
 
 namespace WasmEdge {
 namespace Executor {
@@ -29,6 +30,17 @@ int64_t getTime(timespec ts1, timespec ts2) {
   int64_t nsec = ts2.tv_nsec - ts1.tv_nsec;
   // std::cerr << sec << ", " << nsec << std::endl;
   return sec * 1e9 + nsec;
+}
+
+static void ClearRefs() {
+    int fd;
+    char v[] = "4";
+
+    fd = open("/proc/self/clear_refs", O_WRONLY);
+    if (write(fd, v, 3) < 3) {
+        perror("Can't clear soft-dirty bit");
+    }
+    close(fd);
 }
 
 Expect<void> Executor::runExpression(Runtime::StackManager &StackMgr,
@@ -71,6 +83,8 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
 
   if (Res) {
     if (!Conf.getStatisticsConfigure().getDumpFlag() || Conf.getStatisticsConfigure().getRestoreFlag()) {
+      // Clear soft-dirty
+      ClearRefs();
       Migr.preDumpIter(Func.getModule());
     }
 
