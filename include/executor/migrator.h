@@ -33,7 +33,6 @@ class Migrator {
 public:
   /// TODO: ModuleInstanceがnullだったときの名前。重複しないようにする
   const std::string NULL_MOD_NAME = "null";
-  using IterMigratorType = std::map<AST::InstrView::iterator, SourceLoc>;
 
   struct CtrlInfo {
     // AST::InstrView::iterator Iter;
@@ -79,15 +78,6 @@ public:
     BaseModName = ModInst->getModuleName();
   }
   
-  IterMigratorType getIterMigratorByName(std::string ModName) {
-    if (IterMigrators.count(ModName)) {
-      return IterMigrators[ModName];
-    } else {
-      IterMigratorType I;
-      return I;
-    }
-  }
-
   uint32_t getFuncIdx(const AST::InstrView::iterator PC) {
     if (PC == nullptr) return -1;
     
@@ -187,9 +177,6 @@ public:
   
   std::vector<struct CtrlInfo> getCtrlStack(const AST::InstrView::iterator PCNow, Runtime::Instance::FunctionInstance *Func, const std::vector<uint32_t> &WamrCellSums) {
     std::vector<struct CtrlInfo> CtrlStack;
-    
-    IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
-    // assert(IterMigrator);
 
     AST::InstrView::iterator PCStart = Func->getInstrs().begin();
     AST::InstrView::iterator PCEnd = Func->getInstrs().end();
@@ -528,7 +515,6 @@ public:
 private:
   friend class Executor;
 
-  std::map<std::string, IterMigratorType> IterMigrators;
   std::string BaseModName;
   /// \name Module name mapping.
   std::map<std::string, const Runtime::Instance::ModuleInstance *, std::less<>> NamedMod;
