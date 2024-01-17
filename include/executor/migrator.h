@@ -388,6 +388,7 @@ public:
     for (size_t I = FrameStack.size()-1; I > 0; --I, ++StackIdx) {
       auto f = FrameStack[I];
       const Runtime::Instance::ModuleInstance* ModInst = f.Module;
+      // NOTE: リターンアドレスは、実行しているアドレスの1つまえのアドレスを持っているので+1する
       if (I != FrameStack.size() - 1) PCCopy++;
       auto [FuncIdx, Offset] = getInstrAddrExpr(ModInst, PCCopy);
       TypeStacks[StackIdx] = getTypeStack(FuncIdx, Offset, I != FrameStack.size()-1);
@@ -438,22 +439,14 @@ public:
 
       // 型スタック
       uint32_t StackBottom = f.VPos - f.Locals;
-      // リターンアドレスは1個前のところを保存しているので、+1する
-      // Op::hoge <- 実際持ってるアドレス
-      // Op::Call <- 本来実行しているアドレス
-      // Op::fuga 
-      // auto [NowFuncIdx, NowOffset] = (IsRetAddr 
-      //                                 ?getInstrAddrExpr(ModInst, PC+1)
-      //                                 :getInstrAddrExpr(ModInst, PC));
-      // std::cerr << "(FuncIdx, Offset): (" << NowFuncIdx << ", " << NowOffset << ")" << std::endl;
-      // std::vector<uint8_t> TypeStack = getTypeStack(NowFuncIdx, NowOffset, IsRetAddr);
       std::vector<uint8_t> TypeStack = TypeStacks[StackIdx];
       uint32_t TypeStackLen = TypeStack.size();
       ofs.write(reinterpret_cast<char *>(&TypeStackLen), sizeof(uint32_t));
+      ofs.write(reinterpret_cast<char *>(TypeStack.data()), sizeof(uint8_t) * TypeStackLen);
       // TODO: forで回す必要ないか調べる
-      for (uint32_t I = 0; I < TypeStack.size(); ++I) {
-          ofs.write(reinterpret_cast<char *>(&TypeStack[I]), sizeof(uint8_t));
-      }
+      // for (uint32_t I = 0; I < TypeStack.size(); ++I) {
+      //     ofs.write(reinterpret_cast<char *>(&TypeStack[I]), sizeof(uint8_t));
+      // }
 
       // 値スタック
       // for (uint32_t I = StackBottom; I < StackTop; I++) {
