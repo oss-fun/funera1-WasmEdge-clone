@@ -30,9 +30,7 @@ Expect<void> Executor::runLocalTeeOp(Runtime::StackManager &StackMgr,
 Expect<void> Executor::runGlobalGetOp(Runtime::StackManager &StackMgr,
                                       uint32_t Idx) const noexcept {
   auto *GlobInst = getGlobInstByIdx(StackMgr, Idx);
-  // TODO: 型の場合分けをもとに戻す
   assuming(GlobInst);
-  ValType T = GlobInst->getGlobalType().getValType();
   StackMgr.push(GlobInst->getValue());
   return {};
 }

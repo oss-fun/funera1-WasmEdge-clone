@@ -104,8 +104,8 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
       std::cerr << "Restore global" << std::endl;
 
       // debug: wamrから取り込んだimageをリストアしてすぐdumpすると、同じものが出てくるはず
-      Migr.dumpMemory(StackMgr.getModule());
-      std::cerr << "Success dumpMemory" << std::endl;
+      // Migr.dumpMemory(StackMgr.getModule());
+      // std::cerr << "Success dumpMemory" << std::endl;
       // Migr.dumpGlobal(StackMgr.getModule());
       // std::cerr << "Success dumpGlobal" << std::endl;
       // Migr.dumpProgramCounter(StackMgr.getModule(), StartIt);
