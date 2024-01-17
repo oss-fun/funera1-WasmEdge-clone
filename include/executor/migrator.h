@@ -40,10 +40,8 @@ public:
     uint32_t BeginAddrOfs;
     uint32_t TargetAddrOfs;
     uint32_t ElseAddrOfs;
-    uint32_t TspOfs;
     uint32_t SpOfs;
     uint32_t ResultCells;
-    uint32_t ResultCount;
   };
 
   struct IteratorKeys {
@@ -282,11 +280,11 @@ public:
     
     uint32_t BaseAddr = PCStart->getOffset();
 
-    auto CtrlPush = [&](AST::InstrView::iterator Begin, AST::InstrView::iterator Target, uint32_t SpOfs, uint32_t TspOfs) {
+    auto CtrlPush = [&](AST::InstrView::iterator Begin, AST::InstrView::iterator Target, uint32_t SpOfs) {
       uint32_t BeginOfs = Begin->getOffset() - BaseAddr;
       uint32_t TargetOfs = Target->getOffset() - BaseAddr;
       uint32_t ElseOfs = (Begin + Begin->getJumpElse())->getOffset() - BaseAddr;
-      CtrlStack.push_back({BeginOfs, TargetOfs, ElseOfs, SpOfs, TspOfs, 0, 0});
+      CtrlStack.push_back({BeginOfs, TargetOfs, ElseOfs, SpOfs, 0});
     };
     
     auto CtrlPop = [&]() {
@@ -299,8 +297,8 @@ public:
     
     // 関数ブロックを一番最初にpushする
     // ダミーブロックぽさがすこしあるので、適当に入れる（ちゃんとやると、target_addrに関数の一番最後のアドレスを入れる必要があり、無駄が増えるため）
-    uint32_t SpOfs, TspOfs;
-    CtrlPush(PCStart, PCEnd-1, 0, 0);
+    uint32_t SpOfs;
+    CtrlPush(PCStart, PCEnd-1, 0);
 
     // 命令をなめる
     while (PC < PCNow) {
@@ -309,13 +307,11 @@ public:
         case OpCode::Block:
         case OpCode::If:
           SpOfs = WamrCellSums[PC->getJump().StackEraseBegin];
-          TspOfs = PC->getJump().StackEraseBegin;
-          CtrlPush(PC+1, PC+PC->getJumpEnd(), SpOfs, TspOfs);
+          CtrlPush(PC+1, PC+PC->getJumpEnd(), SpOfs);
           break;
         case OpCode::Loop:
           SpOfs = WamrCellSums[PC->getJump().StackEraseBegin];
-          TspOfs = PC->getJump().StackEraseBegin;
-          CtrlPush(PC+1, PC+1, SpOfs, TspOfs);
+          CtrlPush(PC+1, PC+1, SpOfs);
           break;
 
         // pop
