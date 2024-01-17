@@ -40,10 +40,8 @@ public:
     uint32_t BeginAddrOfs;
     uint32_t TargetAddrOfs;
     uint32_t ElseAddrOfs;
-    uint32_t TspOfs;
     uint32_t SpOfs;
     uint32_t ResultCells;
-    uint32_t ResultCount;
   };
 
   struct IteratorKeys {
@@ -282,11 +280,11 @@ public:
     
     uint32_t BaseAddr = PCStart->getOffset();
 
-    auto CtrlPush = [&](AST::InstrView::iterator Begin, AST::InstrView::iterator Target, uint32_t SpOfs, uint32_t TspOfs) {
+    auto CtrlPush = [&](AST::InstrView::iterator Begin, AST::InstrView::iterator Target, uint32_t SpOfs) {
       uint32_t BeginOfs = Begin->getOffset() - BaseAddr;
       uint32_t TargetOfs = Target->getOffset() - BaseAddr;
       uint32_t ElseOfs = (Begin + Begin->getJumpElse())->getOffset() - BaseAddr;
-      CtrlStack.push_back({BeginOfs, TargetOfs, ElseOfs, SpOfs, TspOfs, 0, 0});
+      CtrlStack.push_back({BeginOfs, TargetOfs, ElseOfs, SpOfs, 0});
     };
     
     auto CtrlPop = [&]() {
@@ -299,8 +297,8 @@ public:
     
     // 関数ブロックを一番最初にpushする
     // ダミーブロックぽさがすこしあるので、適当に入れる（ちゃんとやると、target_addrに関数の一番最後のアドレスを入れる必要があり、無駄が増えるため）
-    uint32_t SpOfs, TspOfs;
-    CtrlPush(PCStart, PCEnd-1, 0, 0);
+    uint32_t SpOfs;
+    CtrlPush(PCStart, PCEnd-1, 0);
 
     // 命令をなめる
     while (PC < PCNow) {
@@ -309,13 +307,11 @@ public:
         case OpCode::Block:
         case OpCode::If:
           SpOfs = WamrCellSums[PC->getJump().StackEraseBegin];
-          TspOfs = PC->getJump().StackEraseBegin;
-          CtrlPush(PC+1, PC+PC->getJumpEnd(), SpOfs, TspOfs);
+          CtrlPush(PC+1, PC+PC->getJumpEnd(), SpOfs);
           break;
         case OpCode::Loop:
           SpOfs = WamrCellSums[PC->getJump().StackEraseBegin];
-          TspOfs = PC->getJump().StackEraseBegin;
-          CtrlPush(PC+1, PC+1, SpOfs, TspOfs);
+          CtrlPush(PC+1, PC+1, SpOfs);
           break;
 
         // pop
@@ -377,7 +373,8 @@ public:
 
   void dumpStack(Runtime::StackManager& StackMgr, AST::InstrView::iterator PC) {
     std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
-    std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
+    std::vector<ValVariant> ValueStack = StackMgr.getValueStack();
+    std::vector<std::vector<uint8_t>> TypeStacks(FrameStack.size());
     std::ofstream frame_fout("frame.img", std::ios::trunc | std::ios::binary);
 
     // header file. frame stackのサイズを記録
@@ -385,20 +382,35 @@ public:
     frame_fout.write(reinterpret_cast<char *>(&LenFrame), sizeof(uint32_t));
     frame_fout.close();
     
+    // 先にフレームごとの命令アドレスを持っておく
+    AST::InstrView::iterator PCCopy = PC;
+    uint32_t StackIdx = 1;
+    for (size_t I = FrameStack.size()-1; I > 0; --I, ++StackIdx) {
+      auto f = FrameStack[I];
+      const Runtime::Instance::ModuleInstance* ModInst = f.Module;
+      // NOTE: リターンアドレスは、実行しているアドレスの1つまえのアドレスを持っているので+1する
+      if (I != FrameStack.size() - 1) PCCopy++;
+      auto [FuncIdx, Offset] = getInstrAddrExpr(ModInst, PCCopy);
+      TypeStacks[StackIdx] = getTypeStack(FuncIdx, Offset, I != FrameStack.size()-1);
+      PCCopy = f.From;
+    }
+
     // TypeStackからWAMRのセルの個数累積和みたいにする
     // 累積和 1-indexed
-    std::vector<uint32_t> WamrCellSums(TypeStack.size()+1, 0);
-    for (uint32_t I = 0; I < TypeStack.size(); I++) {
-        WamrCellSums[I+1] = WamrCellSums[I] + (TypeStack[I] == 0 ? 1 : 2);
+    uint32_t Cur = 0;
+    std::vector<uint32_t> WamrCellSums(StackMgr.size()+1, 0);
+    for (uint32_t StackIdx = TypeStacks.size()-1; StackIdx > 0; --StackIdx) {
+      std::vector<uint8_t> TypeStack = TypeStacks[StackIdx];
+      for (uint32_t I = 0; I < TypeStack.size(); I++) {
+          WamrCellSums[Cur+1] = WamrCellSums[Cur] + TypeStack[I];
+          Cur++;
+      }
     }
 
     // uint32_t PreStackTop = FrameStack[0].VPos - FrameStack[0].Locals;
     // フレームスタックを上から見ていく。上からstack1, stack2...とする
-    uint32_t StackIdx = 1;
-    uint32_t StackTop = StackMgr.size();
-    bool IsRetAddr;
+    StackIdx = 1;
     for (size_t I = FrameStack.size()-1; I > 0; --I, ++StackIdx) {
-      IsRetAddr = (bool)(I != FrameStack.size()-1);
       std::ofstream ofs("stack" + std::to_string(StackIdx) + ".img", std::ios::trunc | std::ios::binary);
       Runtime::StackManager::Frame f = FrameStack[I];
  
@@ -426,37 +438,15 @@ public:
 
       // 型スタック
       uint32_t StackBottom = f.VPos - f.Locals;
-      uint32_t TspOfs = StackTop - StackBottom;
-      ofs.write(reinterpret_cast<char *>(&TspOfs), sizeof(uint32_t));
-      for (uint32_t I = StackBottom; I < StackTop; I++) {
-          ofs.write(reinterpret_cast<char *>(&TypeStack[I]), sizeof(uint8_t));
-      }
-      // リターンアドレスは1個前のところを保存しているので、+1する
-      // Op::hoge <- 実際持ってるアドレス
-      // Op::Call <- 本来実行しているアドレス
-      // Op::fuga 
-      auto [NowFuncIdx, NowOffset] = (IsRetAddr 
-                                      ?getInstrAddrExpr(ModInst, PC+1)
-                                      :getInstrAddrExpr(ModInst, PC));
-      std::cerr << "(FuncIdx, Offset): (" << NowFuncIdx << ", " << NowOffset << ")" << std::endl;
-      std::vector<uint8_t> TypeStackFromFile = getTypeStack(NowFuncIdx, NowOffset, IsRetAddr);
-
-      // NOTE: ファイルで取得したものが正しいかチェック
-      if (TspOfs != TypeStackFromFile.size()) std::cerr << "型スタックのサイズが違う. " << TspOfs << "!=" << TypeStackFromFile.size() << std::endl;
-      for (uint32_t I = 0; I < TypeStackFromFile.size(); ++I) {
-        if (TypeStack[StackBottom+I] != TypeStackFromFile[I]) {
-          std::cerr << "型スタックの中身が違う. " << std::endl;
-          break;
-        }
-      }
-      // for (uint32_t I = 0; I < TypeStackFromFile.size(); ++I) {
-      //     ofs.write(reinterpret_cast<char *>(&TypeStackFromFile[I]), sizeof(uint8_t));
-      // }
+      std::vector<uint8_t> TypeStack = TypeStacks[StackIdx];
+      uint32_t TypeStackLen = TypeStack.size();
+      ofs.write(reinterpret_cast<char *>(&TypeStackLen), sizeof(uint32_t));
+      ofs.write(reinterpret_cast<char *>(TypeStack.data()), sizeof(uint8_t) * TypeStackLen);
 
       // 値スタック
-      std::vector<ValVariant> ValueStack = StackMgr.getValueStack();
-      for (uint32_t I = StackBottom; I < StackTop; I++) {
-        ofs.write(reinterpret_cast<char *>(&ValueStack[I].get<uint128_t>()), sizeof(uint32_t) * TypeStack[I]);
+      // for (uint32_t I = StackBottom; I < StackTop; I++) {
+      for (uint32_t I = 0; I < TypeStackLen; I++) {
+        ofs.write(reinterpret_cast<char *>(&ValueStack[StackBottom+I].get<uint128_t>()), sizeof(uint32_t) * TypeStack[I]);
       }
 
       // ラベルスタック
@@ -474,17 +464,13 @@ public:
         ofs.write(reinterpret_cast<char *>(&ci.BeginAddrOfs), sizeof(uint32_t));
         ofs.write(reinterpret_cast<char *>(&ci.TargetAddrOfs), sizeof(uint32_t));
         ofs.write(reinterpret_cast<char *>(&ci.SpOfs), sizeof(uint32_t));
-        ofs.write(reinterpret_cast<char *>(&ci.TspOfs), sizeof(uint32_t));
         ofs.write(reinterpret_cast<char *>(&ci.ResultCells), sizeof(uint32_t));
-        ofs.write(reinterpret_cast<char *>(&ci.ResultCount), sizeof(uint32_t));
       }
 
       ofs.close();
 
       // 各値を更新
       PC = f.From;
-      StackTop = StackBottom;
-      // std::cerr << "[DEBUG]StackTop is " << StackTop << std::endl;
 
       // debug
       // debugFrame(I, EnterFuncIdx, f.Locals, f.Arity, f.VPos);
@@ -629,7 +615,7 @@ public:
       for (uint32_t I = 0; I < TspOfs; I++) {
         ValVariant Value;
         ifs.read(reinterpret_cast<char *>(&Value), sizeof(uint32_t) * TypeStack[I]);
-        StackMgr.push(Value, TypeStack[I]);
+        StackMgr.push(Value);
       }
 
       ifs.close();

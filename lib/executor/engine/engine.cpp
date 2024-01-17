@@ -104,8 +104,8 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
       std::cerr << "Restore global" << std::endl;
 
       // debug: wamrから取り込んだimageをリストアしてすぐdumpすると、同じものが出てくるはず
-      Migr.dumpMemory(StackMgr.getModule());
-      std::cerr << "Success dumpMemory" << std::endl;
+      // Migr.dumpMemory(StackMgr.getModule());
+      // std::cerr << "Success dumpMemory" << std::endl;
       // Migr.dumpGlobal(StackMgr.getModule());
       // std::cerr << "Success dumpGlobal" << std::endl;
       // Migr.dumpProgramCounter(StackMgr.getModule(), StartIt);
@@ -234,18 +234,14 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     case OpCode::Select_t: {
       // Pop the i32 value and select values from stack.
       ValVariant CondVal = StackMgr.pop();
-      const uint8_t &T2 = StackMgr.getTypeTop();
       ValVariant Val2 = StackMgr.pop();
-      const uint8_t &T1 = StackMgr.getTypeTop();
       ValVariant Val1 = StackMgr.pop();
 
       // Select the value.
       if (CondVal.get<uint32_t>() == 0) {
         StackMgr.push(Val2);
-        StackMgr.getTypeTop() = T2;
       } else {
         StackMgr.push(Val1);
-        StackMgr.getTypeTop() = T1;
       }
       return {};
     }
