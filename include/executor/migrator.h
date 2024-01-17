@@ -373,6 +373,8 @@ public:
 
   void dumpStack(Runtime::StackManager& StackMgr, AST::InstrView::iterator PC) {
     std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
+    std::vector<ValVariant> ValueStack = StackMgr.getValueStack();
+    std::vector<std::vector<uint8_t>> TypeStacks(FrameStack.size());
     std::ofstream frame_fout("frame.img", std::ios::trunc | std::ios::binary);
 
     // header file. frame stackのサイズを記録
@@ -381,39 +383,35 @@ public:
     frame_fout.close();
     
     // 先にフレームごとの命令アドレスを持っておく
-    // FramePCsはトップのフレームがボトムにくるようにしてある。（つまりスタック形式で扱う)
-    // FramePCsはWamrCellSumsを計算するためだけに利用.
-    std::vector<std::pair<uint32_t, uint32_t>> FramePCs(0);
     AST::InstrView::iterator PCCopy = PC;
-    for (size_t I = FrameStack.size()-1; I > 0; --I) {
+    uint32_t StackIdx = 1;
+    for (size_t I = FrameStack.size()-1; I > 0; --I, ++StackIdx) {
       auto f = FrameStack[I];
       const Runtime::Instance::ModuleInstance* ModInst = f.Module;
-      if (I == FrameStack.size()-1) FramePCs.push_back(getInstrAddrExpr(ModInst, PC));
-      else                          FramePCs.push_back(getInstrAddrExpr(ModInst, PC+1));
-      PC = (I == 1 ? f.From : f.From+1);
+      // NOTE: リターンアドレスは、実行しているアドレスの1つまえのアドレスを持っているので+1する
+      if (I != FrameStack.size() - 1) PCCopy++;
+      auto [FuncIdx, Offset] = getInstrAddrExpr(ModInst, PCCopy);
+      TypeStacks[StackIdx] = getTypeStack(FuncIdx, Offset, I != FrameStack.size()-1);
+      PCCopy = f.From;
     }
-    PC = PCCopy;
 
     // TypeStackからWAMRのセルの個数累積和みたいにする
     // 累積和 1-indexed
+    uint32_t Cur = 0;
     std::vector<uint32_t> WamrCellSums(StackMgr.size()+1, 0);
-    while(!FramePCs.empty()) {
-      auto [FuncIdx, Offset] = FramePCs.back();
-      FramePCs.pop_back();
-      std::vector<uint8_t> TypeStack = getTypeStack(FuncIdx, Offset, FramePCs.empty());
-
+    for (uint32_t StackIdx = TypeStacks.size()-1; StackIdx > 0; --StackIdx) {
+      std::vector<uint8_t> TypeStack = TypeStacks[StackIdx];
       for (uint32_t I = 0; I < TypeStack.size(); I++) {
-          WamrCellSums[I+1] = WamrCellSums[I] + TypeStack[I];
+          WamrCellSums[Cur+1] = WamrCellSums[Cur] + TypeStack[I];
+          Cur++;
       }
     }
 
     // uint32_t PreStackTop = FrameStack[0].VPos - FrameStack[0].Locals;
     // フレームスタックを上から見ていく。上からstack1, stack2...とする
-    uint32_t StackIdx = 1;
+    StackIdx = 1;
     uint32_t StackTop = StackMgr.size();
-    bool IsRetAddr;
     for (size_t I = FrameStack.size()-1; I > 0; --I, ++StackIdx) {
-      IsRetAddr = (bool)(I != FrameStack.size()-1);
       std::ofstream ofs("stack" + std::to_string(StackIdx) + ".img", std::ios::trunc | std::ios::binary);
       Runtime::StackManager::Frame f = FrameStack[I];
  
@@ -441,24 +439,12 @@ public:
 
       // 型スタック
       uint32_t StackBottom = f.VPos - f.Locals;
-      // リターンアドレスは1個前のところを保存しているので、+1する
-      // Op::hoge <- 実際持ってるアドレス
-      // Op::Call <- 本来実行しているアドレス
-      // Op::fuga 
-      auto [NowFuncIdx, NowOffset] = (IsRetAddr 
-                                      ?getInstrAddrExpr(ModInst, PC+1)
-                                      :getInstrAddrExpr(ModInst, PC));
-      std::cerr << "(FuncIdx, Offset): (" << NowFuncIdx << ", " << NowOffset << ")" << std::endl;
-      std::vector<uint8_t> TypeStack = getTypeStack(NowFuncIdx, NowOffset, IsRetAddr);
+      std::vector<uint8_t> TypeStack = TypeStacks[StackIdx];
       uint32_t TypeStackLen = TypeStack.size();
       ofs.write(reinterpret_cast<char *>(&TypeStackLen), sizeof(uint32_t));
-      // TODO: forで回す必要ないか調べる
-      for (uint32_t I = 0; I < TypeStack.size(); ++I) {
-          ofs.write(reinterpret_cast<char *>(&TypeStack[I]), sizeof(uint8_t));
-      }
+      ofs.write(reinterpret_cast<char *>(TypeStack.data()), sizeof(uint8_t) * TypeStackLen);
 
       // 値スタック
-      std::vector<ValVariant> ValueStack = StackMgr.getValueStack();
       // for (uint32_t I = StackBottom; I < StackTop; I++) {
       for (uint32_t I = 0; I < TypeStackLen; I++) {
         ofs.write(reinterpret_cast<char *>(&ValueStack[StackBottom+I].get<uint128_t>()), sizeof(uint32_t) * TypeStack[I]);
