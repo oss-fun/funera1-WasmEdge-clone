@@ -443,10 +443,6 @@ public:
       uint32_t TypeStackLen = TypeStack.size();
       ofs.write(reinterpret_cast<char *>(&TypeStackLen), sizeof(uint32_t));
       ofs.write(reinterpret_cast<char *>(TypeStack.data()), sizeof(uint8_t) * TypeStackLen);
-      // TODO: forで回す必要ないか調べる
-      // for (uint32_t I = 0; I < TypeStack.size(); ++I) {
-      //     ofs.write(reinterpret_cast<char *>(&TypeStack[I]), sizeof(uint8_t));
-      // }
 
       // 値スタック
       // for (uint32_t I = StackBottom; I < StackTop; I++) {
