@@ -45,10 +45,8 @@ public:
   };
 
   struct IteratorKeys {
-    // すべての関数の先頭アドレスを照準に並べたリスト
-    std::vector<uintptr_t> AddrVec;
-    // 関数の先頭アドレス -> 関数インデックス
-    std::map<uintptr_t, uint32_t> AddrToIdx;
+    // すべての関数の(先頭アドレス, 関数インデックス)を昇順に並べたリスト
+    std::vector<std::pair<uintptr_t, uint32_t>> AddrVec;
   };
 
   /// ================
@@ -70,11 +68,10 @@ public:
       Runtime::Instance::FunctionInstance* FuncInst = ModInst->getFunc(I).value();
       AST::InstrView Instr = FuncInst->getInstrs();
       AST::InstrView::iterator PC = Instr.begin();
-      ik.AddrVec.push_back(uintptr_t(PC));
-      ik.AddrToIdx[uintptr_t(PC)] = I;
+      ik.AddrVec.emplace_back(uintptr_t(PC), I);
     }
     // 門番
-    ik.AddrVec.push_back(UINT64_MAX);
+    ik.AddrVec.emplace_back(UINT64_MAX, UINT32_MAX);
 
     // 昇順ソート
     std::sort(ik.AddrVec.begin(), ik.AddrVec.end());
@@ -94,9 +91,8 @@ public:
   uint32_t getFuncIdx(const AST::InstrView::iterator PC) {
     if (PC == nullptr) return -1;
     
-    auto Ret = std::upper_bound(ik.AddrVec.begin(), ik.AddrVec.end(), uintptr_t(PC));
-    uintptr_t PCStart = *(Ret-1);
-    uint32_t FuncIdx = ik.AddrToIdx[PCStart];
+    auto Ret = std::upper_bound(ik.AddrVec.begin(), ik.AddrVec.end(), std::make_pair(uintptr_t(PC), uint32_t(0)));
+    auto [PCStart, FuncIdx] = *(Ret-1);
 
     return FuncIdx;
   }
