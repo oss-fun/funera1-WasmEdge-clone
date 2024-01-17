@@ -65,7 +65,7 @@ public:
   }
 
   // void Prepare(const Runtime::Instance::ModuleInstance* ModInst) {
-  void setIterMigrator(const Runtime::Instance::ModuleInstance* ModInst) {
+  void Prepare(const Runtime::Instance::ModuleInstance* ModInst) {
     for (uint32_t I = 0; I < ModInst->getFuncNum(); ++I) {
       Runtime::Instance::FunctionInstance* FuncInst = ModInst->getFunc(I).value();
       AST::InstrView Instr = FuncInst->getInstrs();
@@ -78,6 +78,8 @@ public:
 
     // 昇順ソート
     std::sort(ik.AddrVec.begin(), ik.AddrVec.end());
+
+    BaseModName = ModInst->getModuleName();
   }
   
   IterMigratorType getIterMigratorByName(std::string ModName) {
@@ -257,11 +259,6 @@ public:
     ModInst->dumpGlobInst();
   }
 
-  /// TODO: 関数名を中身にあったものにrenameする
-  void preDumpIter(const Runtime::Instance::ModuleInstance* ModInst) {
-    setIterMigrator(ModInst);
-    BaseModName = ModInst->getModuleName();
-  }
 
   Expect<void> dumpProgramCounter(const Runtime::Instance::ModuleInstance* ModInst, AST::InstrView::iterator Iter) {
     std::ofstream ofs("program_counter.img", std::ios::trunc | std::ios::binary);

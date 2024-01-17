@@ -85,7 +85,7 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
     if (!Conf.getStatisticsConfigure().getDumpFlag() || Conf.getStatisticsConfigure().getRestoreFlag()) {
       // Clear soft-dirty
       ClearRefs();
-      Migr.preDumpIter(Func.getModule());
+      Migr.Prepare(Func.getModule());
     }
 
     // Restore
