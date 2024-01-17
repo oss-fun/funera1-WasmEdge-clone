@@ -33,16 +33,7 @@ Expect<void> Executor::runGlobalGetOp(Runtime::StackManager &StackMgr,
   // TODO: 型の場合分けをもとに戻す
   assuming(GlobInst);
   ValType T = GlobInst->getGlobalType().getValType();
-  if (T == ValType::I32 || T == ValType::F32) {
-    StackMgr.push(GlobInst->getValue());
-  }
-  else if (T == ValType::I64 || T == ValType::F64) {
-    StackMgr.push(GlobInst->getValue());
-  }
-  else {
-    StackMgr.push(GlobInst->getValue());
-  }
-  // std::cout << "[DEBUG]push stack: type kind: " << +StackMgr.getTypeTop() << ", Pos: " << StackMgr.getValueStack().size() << " " << StackMgr.getTypeStack().size() << std::endl;
+  StackMgr.push(GlobInst->getValue());
   return {};
 }
 
