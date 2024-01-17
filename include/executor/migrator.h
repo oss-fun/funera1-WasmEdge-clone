@@ -410,7 +410,6 @@ public:
     // uint32_t PreStackTop = FrameStack[0].VPos - FrameStack[0].Locals;
     // フレームスタックを上から見ていく。上からstack1, stack2...とする
     StackIdx = 1;
-    uint32_t StackTop = StackMgr.size();
     for (size_t I = FrameStack.size()-1; I > 0; --I, ++StackIdx) {
       std::ofstream ofs("stack" + std::to_string(StackIdx) + ".img", std::ios::trunc | std::ios::binary);
       Runtime::StackManager::Frame f = FrameStack[I];
@@ -472,8 +471,6 @@ public:
 
       // 各値を更新
       PC = f.From;
-      StackTop = StackBottom;
-      std::cerr << "[DEBUG]StackTop is " << StackTop << std::endl;
 
       // debug
       // debugFrame(I, EnterFuncIdx, f.Locals, f.Arity, f.VPos);
