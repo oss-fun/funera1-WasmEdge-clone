@@ -405,7 +405,7 @@ public:
     }
     return 0;
   }
-  
+
   Expect<void> dumpDataPtr(std::string filename) {
     // Open file
     // filename = filename + "_dataptr.img";
@@ -423,6 +423,14 @@ public:
     Span<Byte> Data = Res.value();
     dumpDirtyMemory(Data, ofs);
     ofs.close();
+
+    // デバッグ: no-soft-dirty
+    // std::ofstream ofs3("no_soft_dirty_memory.img", std::ios::trunc | std::ios::binary);
+    // if (!ofs3) {
+    //   return Unexpect(ErrCode::Value::IllegalPath);
+    // }
+    // dumpDirtyMemory(Data, ofs3, true);
+    // ofs3.close();
 
     // デバッグのために全部吐き出すやつもやる
     std::ofstream ofs2("all_memory.img", std::ios::trunc | std::ios::binary);

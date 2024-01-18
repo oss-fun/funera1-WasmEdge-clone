@@ -32,16 +32,16 @@ int64_t getTime(timespec ts1, timespec ts2) {
   return sec * 1e9 + nsec;
 }
 
-static void ClearRefs() {
+  void ClearRefs() {
     int fd;
     char v[] = "4";
 
     fd = open("/proc/self/clear_refs", O_WRONLY);
-    if (write(fd, v, 3) < 3) {
+    if (write(fd, v, sizeof(v)) < (ssize_t)sizeof(v)) {
         perror("Can't clear soft-dirty bit");
     }
     close(fd);
-}
+  }
 
 Expect<void> Executor::runExpression(Runtime::StackManager &StackMgr,
                                      AST::InstrView Instrs) {
@@ -84,7 +84,6 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
   if (Res) {
     if (!Conf.getStatisticsConfigure().getDumpFlag() || Conf.getStatisticsConfigure().getRestoreFlag()) {
       // Clear soft-dirty
-      ClearRefs();
       Migr.Prepare(Func.getModule());
     }
 
@@ -1888,6 +1887,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
 
   // signal handler
   signal(SIGINT, &signalHandler);
+  ClearRefs();
 
   // int dispatch_count = 0;
   // int dispatch_limit = 1000;
