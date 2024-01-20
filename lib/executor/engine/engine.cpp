@@ -47,7 +47,7 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
 
   // Push arguments.
   for (auto &Val : Params) {
-    std::cout << "[DEBUG]runFunction Params: " << Val.get<uint128_t>() << std::endl;
+    std::cerr << "[DEBUG]runFunction Params: " << Val.get<uint128_t>() << std::endl;
     StackMgr.push(Val);
   }
 
@@ -77,14 +77,28 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
       if (!Res) {
         return Unexpect(Res);
       }
-      StartIt = Res.value();
-      std::cerr << "Restore pc" << std::endl;
-      Migr.restoreStack(StackMgr);
-      std::cerr << "Restore stack" << std::endl;
+
+      struct timespec ts1, ts2;
+
+      clock_gettime(CLOCK_MONOTONIC, &ts1);
       Migr.restoreMemory(StackMgr.getModule());
-      std::cerr << "Restore memory" << std::endl;
+      clock_gettime(CLOCK_MONOTONIC, &ts2);
+      std::cerr << "memory, " << getTime(ts1, ts2) << std::endl;
+
+      clock_gettime(CLOCK_MONOTONIC, &ts1);
       Migr.restoreGlobal(StackMgr.getModule());
-      std::cerr << "Restore global" << std::endl;
+      clock_gettime(CLOCK_MONOTONIC, &ts2);
+      std::cerr << "global, " << getTime(ts1, ts2) << std::endl;
+
+      clock_gettime(CLOCK_MONOTONIC, &ts1);
+      StartIt = Res.value();
+      clock_gettime(CLOCK_MONOTONIC, &ts2);
+      std::cerr << "program counter, " << getTime(ts1, ts2) << std::endl;
+
+      clock_gettime(CLOCK_MONOTONIC, &ts1);
+      Migr.restoreStack(StackMgr);
+      clock_gettime(CLOCK_MONOTONIC, &ts2);
+      std::cerr << "stack, " << getTime(ts1, ts2) << std::endl;
 
       // debug: wamrから取り込んだimageをリストアしてすぐdumpすると、同じものが出てくるはず
       // Migr.dumpMemory(StackMgr.getModule());
