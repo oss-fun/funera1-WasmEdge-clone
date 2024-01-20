@@ -15,7 +15,6 @@
 
 #include "ast/instruction.h"
 #include "runtime/instance/module.h"
-// #include "executor/migrator.h"
 
 #include <vector>
 
@@ -102,12 +101,6 @@ public:
                  AST::InstrView::iterator From, uint32_t LocalNum = 0,
                  uint32_t Arity = 0, bool IsTailCall = false) noexcept {
 
-    _pushFrame(Module, From, LocalNum, Arity, ValueStack.size(), IsTailCall);
-  }
-
-  void pushFrameExt(const Instance::ModuleInstance *Module,
-                 AST::InstrView::iterator From,
-                 uint32_t LocalNum = 0, uint32_t Arity = 0, bool IsTailCall = false) noexcept {
     _pushFrame(Module, From, LocalNum, Arity, ValueStack.size(), IsTailCall);
   }
 

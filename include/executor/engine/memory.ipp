@@ -46,7 +46,6 @@ TypeN<T> Executor::runStoreOp(Runtime::StackManager &StackMgr,
 
   // Calculate EA = i + offset
   uint32_t I = StackMgr.pop().get<uint32_t>();
-  // std::cerr << "[DEBUG]Memory Base Addr: " << I << std::endl;
   if (I > std::numeric_limits<uint32_t>::max() - Instr.getMemoryOffset()) {
     spdlog::error(ErrCode::Value::MemoryOutOfBounds);
     spdlog::error(ErrInfo::InfoBoundary(

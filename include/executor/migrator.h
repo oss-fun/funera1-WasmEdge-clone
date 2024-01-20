@@ -20,15 +20,6 @@ namespace Runtime {
 }
 
 namespace Executor {
-struct SourceLoc {
-  bool operator==(const SourceLoc& rhs) const {
-    return (FuncIdx == rhs.FuncIdx && Offset == rhs.Offset);
-  }
-
-  uint32_t FuncIdx;
-  uint32_t Offset;
-};
-
 class Migrator {
 public:
   /// TODO: ModuleInstanceがnullだったときの名前。重複しないようにする
@@ -51,15 +42,6 @@ public:
   /// ================
   /// Tools
   /// ================
-
-  /// Find module by name.
-  const Runtime::Instance::ModuleInstance *findModule(std::string_view Name) const {
-    auto Iter = NamedMod.find(Name);
-    if (likely(Iter != NamedMod.cend())) {
-      return Iter->second;
-    }
-    return nullptr;
-  }
 
   // void Prepare(const Runtime::Instance::ModuleInstance* ModInst) {
   void Prepare(const Runtime::Instance::ModuleInstance* ModInst) {
