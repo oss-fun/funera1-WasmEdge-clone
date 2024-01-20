@@ -118,7 +118,7 @@ Expect<void>
 Executor::runTableSizeOp(Runtime::StackManager &StackMgr,
                          Runtime::Instance::TableInstance &TabInst) {
   // Push SZ = size to stack.
-  StackMgr.push<uint32_t>(TabInst.getSize());
+  StackMgr.push(TabInst.getSize());
   return {};
 }
 

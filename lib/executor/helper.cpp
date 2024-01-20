@@ -86,9 +86,7 @@ Executor::enterFunction(Runtime::StackManager &StackMgr,
     }
 
     // Push returns back to stack.
-    std::vector<ValType> RetTypes = FuncType.getReturnTypes();
-    for (uint32_t I = 0; I < Rets.size(); I++) {
-      auto &R = Rets[I];
+    for (auto &R : Rets) {
       StackMgr.push(std::move(R));
     }
 
