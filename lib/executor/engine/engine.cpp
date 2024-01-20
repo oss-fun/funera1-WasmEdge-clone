@@ -122,13 +122,13 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
 
       RestoreFlag = false;
     }
-  
+
     // If not terminated, execute the instructions in interpreter mode.
     // For the entering AOT or host functions, the `StartIt` is equal to the end
     // of instruction list, therefore the execution will return immediately.
     Res = execute(StackMgr, StartIt, Func.getInstrs().end());
   }
-  
+
   if (Res) {
     spdlog::debug(" Execution succeeded.");
   } else if (Res.error() == ErrCode::Value::Terminated) {
@@ -1896,7 +1896,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
   while (PC != PCEnd) {
     // dispatch_count++;
     // if (dispatch_count == dispatch_limit) DumpFlag = true;
-      
+
 
     if (Stat) {
       OpCode Code = PC->getOpCode();
@@ -1912,7 +1912,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
           return Unexpect(ErrCode::Value::CostLimitExceeded);
         }
       }
-      
+
       // if (isInteractiveMode && Conf.getStatisticsConfigure().getDebugMode()) {
       //   // DebugMode
       //   // PCのsource locationとbreakで与えられたsource locationが一致するか判定し、一致する場合、isInteractiveMode = trueにする
@@ -1922,7 +1922,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
       //   if (PCSourceLoc == breakpoint) {
       //     isInteractiveMode = true;
       //   }
-        
+
       //   if (isInteractiveMode) {
       //     OpCode Code = PC->getOpCode();
       //     std::cout << "Code is " << std::hex << static_cast<int>(Code) << std::noshowbase << std::endl;
@@ -1966,7 +1966,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
       return {};
     }
 
-     
+
     // OpCode Code = PC->getOpCode();
     // std::cout << "[DEBUG]OpCode: 0x" << std::hex << (uint16_t)Code << std::dec << std::endl;
     if (auto Res = Dispatch(); !Res) {
@@ -1975,7 +1975,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
       // InteractiveMode(breakpoint, PCSourceLoc, StackMgr);
       return Unexpect(Res);
     }
-    
+
     PC++;
   }
   return {};
