@@ -397,7 +397,7 @@ public:
           return -1;
       }
 
-      if (IsSoftDirtyPage(PageMapEntry)) {
+      if (IsDirtyPage(PageMapEntry)) {
         uint32_t MemInstAddr = Addr - BegAddr;
         ofs.write(reinterpret_cast<char *>(&MemInstAddr), sizeof(uint32_t));
         ofs.write(reinterpret_cast<char *>(Addr), PAGE_SIZE);
