@@ -21,6 +21,13 @@ void signalHandler(int signum) {
   DumpFlag = true;
 }
 
+int64_t getTime(timespec ts1) {
+  int64_t sec = ts1.tv_sec;
+  int64_t nsec = ts1.tv_nsec;
+  // std::cerr << sec << ", " << nsec << std::endl;
+  return sec * 1e9 + nsec;
+}
+
 int64_t getTime(timespec ts1, timespec ts2) {
   int64_t sec = ts2.tv_sec - ts1.tv_sec;
   int64_t nsec = ts2.tv_nsec - ts1.tv_nsec;
@@ -79,6 +86,8 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
       }
 
       struct timespec ts1, ts2;
+      clock_gettime(CLOCK_MONOTONIC, &ts1);
+      std::cerr << "boot_end, " << getTime(ts1) << std::endl;
 
       clock_gettime(CLOCK_MONOTONIC, &ts1);
       Migr.restoreMemory(StackMgr.getModule());

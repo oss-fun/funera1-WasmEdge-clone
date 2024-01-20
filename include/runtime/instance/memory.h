@@ -425,12 +425,12 @@ public:
     ofs.close();
 
     // デバッグのために全部吐き出すやつもやる
-    std::ofstream ofs2("all_memory.img", std::ios::trunc | std::ios::binary);
-    if (!ofs2) {
-      return Unexpect(ErrCode::Value::IllegalPath);
-    }
-    ofs2.write(reinterpret_cast<char*>(Data.data()), Data.size());
-    ofs2.close();
+    // std::ofstream ofs2("all_memory.img", std::ios::trunc | std::ios::binary);
+    // if (!ofs2) {
+    //   return Unexpect(ErrCode::Value::IllegalPath);
+    // }
+    // ofs2.write(reinterpret_cast<char*>(Data.data()), Data.size());
+    // ofs2.close();
     return {};
   }
   
