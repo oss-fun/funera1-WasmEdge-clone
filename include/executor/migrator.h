@@ -20,15 +20,6 @@ namespace Runtime {
 }
 
 namespace Executor {
-struct SourceLoc {
-  bool operator==(const SourceLoc& rhs) const {
-    return (FuncIdx == rhs.FuncIdx && Offset == rhs.Offset);
-  }
-
-  uint32_t FuncIdx;
-  uint32_t Offset;
-};
-
 class Migrator {
 public:
   /// TODO: ModuleInstanceがnullだったときの名前。重複しないようにする
@@ -45,21 +36,13 @@ public:
 
   struct IteratorKeys {
     // すべての関数の(先頭アドレス, 関数インデックス)を昇順に並べたリスト
-    std::vector<std::pair<uintptr_t, uint32_t>> AddrVec;
+    std::vector<uintptr_t> AddrVec;
+    std::map<uintptr_t, uint32_t> AddrToIdx;
   };
 
   /// ================
   /// Tools
   /// ================
-
-  /// Find module by name.
-  const Runtime::Instance::ModuleInstance *findModule(std::string_view Name) const {
-    auto Iter = NamedMod.find(Name);
-    if (likely(Iter != NamedMod.cend())) {
-      return Iter->second;
-    }
-    return nullptr;
-  }
 
   // void Prepare(const Runtime::Instance::ModuleInstance* ModInst) {
   void Prepare(const Runtime::Instance::ModuleInstance* ModInst) {
@@ -67,10 +50,11 @@ public:
       Runtime::Instance::FunctionInstance* FuncInst = ModInst->getFunc(I).value();
       AST::InstrView Instr = FuncInst->getInstrs();
       AST::InstrView::iterator PC = Instr.begin();
-      ik.AddrVec.emplace_back(uintptr_t(PC), I);
+      ik.AddrVec.push_back(uintptr_t(PC));
+      ik.AddrToIdx[uintptr_t(PC)] = I;
     }
     // 門番
-    ik.AddrVec.emplace_back(UINT64_MAX, UINT32_MAX);
+    ik.AddrVec.push_back(UINT64_MAX);
 
     // 昇順ソート
     std::sort(ik.AddrVec.begin(), ik.AddrVec.end());
@@ -81,10 +65,8 @@ public:
   uint32_t getFuncIdx(const AST::InstrView::iterator PC) {
     if (PC == nullptr) return -1;
     
-    auto Ret = std::upper_bound(ik.AddrVec.begin(), ik.AddrVec.end(), std::make_pair(uintptr_t(PC), uint32_t(0)));
-    auto [PCStart, FuncIdx] = *(Ret-1);
-
-    return FuncIdx;
+    auto Ret = std::upper_bound(ik.AddrVec.begin(), ik.AddrVec.end(), uintptr_t(PC));
+    return ik.AddrToIdx[*(Ret-1)];
   }
 
   std::pair<uint32_t, uint32_t> getInstrAddrExpr(const Runtime::Instance::ModuleInstance *ModInst, AST::InstrView::iterator PC) {

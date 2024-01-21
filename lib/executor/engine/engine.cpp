@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2019-2022 Second State INC
 
 #include "executor/executor.h"
-#include "./debugger.cpp"
 
 #include <array>
 #include <cstdint>
@@ -14,9 +13,6 @@ namespace WasmEdge {
 namespace Executor {
 
 bool DumpFlag;
-bool restoreTestFlag = true;
-bool isInteractiveMode = true;
-SourceLoc breakpoint;
 
 // TODO: signumの処理無駄なのでどうにかする
 void signalHandler(int signum) {
@@ -235,13 +231,10 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
 
     // Variable Instructions
     case OpCode::Local__get:
-      // std::cout << "[DEBUG]local.get " << Instr.getTargetIndex() << std::endl;
       return runLocalGetOp(StackMgr, Instr.getStackOffset());
     case OpCode::Local__set:
-      // std::cout << "[DEBUG]local.get " << Instr.getTargetIndex() << std::endl;
       return runLocalSetOp(StackMgr, Instr.getStackOffset());
     case OpCode::Local__tee:
-      // std::cout << "[DEBUG]local.get " << Instr.getTargetIndex() << std::endl;
       return runLocalTeeOp(StackMgr, Instr.getStackOffset());
     case OpCode::Global__get:
       return runGlobalGetOp(StackMgr, Instr.getTargetIndex());
@@ -367,12 +360,10 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
 
     // Const numeric instructions
     case OpCode::I32__const:
-    case OpCode::F32__const:
-      StackMgr.push<uint32_t>(Instr.getNum().get<uint32_t>());
-      return {};
     case OpCode::I64__const:
+    case OpCode::F32__const:
     case OpCode::F64__const:
-      StackMgr.push<uint64_t>(Instr.getNum().get<uint64_t>());
+      StackMgr.push(Instr.getNum());
       return {};
 
     // Unary numeric instructions
