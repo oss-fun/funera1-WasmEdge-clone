@@ -13,7 +13,7 @@ namespace WasmEdge {
 namespace Executor {
 
 // TODO: signumの処理無駄なのでどうにかする
-sig_atomic_t DumpFlag;
+volatile sig_atomic_t DumpFlag;
 void signalHandler(int signum) {
   DumpFlag = signum|1;
 }
@@ -1885,7 +1885,10 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
   };
 
   // signal handler
-  signal(SIGINT, &signalHandler);
+  struct sigaction sa;
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_handler = signalHandler;
+  sigaction(SIGINT, &sa, nullptr);
 
   const uint8_t isInstructionCounting = Conf.getStatisticsConfigure().isInstructionCounting();
   const uint8_t isCostMeasuring = Conf.getStatisticsConfigure().isCostMeasuring();
