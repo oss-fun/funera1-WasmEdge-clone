@@ -1867,7 +1867,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
   // signal handler
   signal(SIGINT, &signalHandler);
 
-  // int dispatch_count = 0;
+  // int64_t dispatch_count = 0;
   // int dispatch_limit = 1000;
 
   while (PC != PCEnd) {

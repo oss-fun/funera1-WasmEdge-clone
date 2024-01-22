@@ -85,6 +85,11 @@ public:
     std::ifstream type_table("type_table", std::ios::binary);
     std::ifstream tablemap_func("tablemap_func", std::ios::binary);
     std::ifstream tablemap_offset("tablemap_offset", std::ios::binary);
+    
+    if (!type_table | !tablemap_func | !tablemap_offset) {
+      std::cerr << "Please make typestack table." << std::endl;
+      exit(1);
+    }
 
     /// tablemap_func
     uint32_t _FuncIdx;
