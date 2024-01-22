@@ -12,13 +12,10 @@
 namespace WasmEdge {
 namespace Executor {
 
-bool DumpFlag;
-
 // TODO: signumの処理無駄なのでどうにかする
+sig_atomic_t DumpFlag;
 void signalHandler(int signum) {
-  if (signum)
-    DumpFlag = true;
-  DumpFlag = true;
+  DumpFlag = signum|1;
 }
 
 int64_t getTime(timespec ts1) {
@@ -1890,6 +1887,10 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
   // signal handler
   signal(SIGINT, &signalHandler);
 
+  const uint8_t isInstructionCounting = Conf.getStatisticsConfigure().isInstructionCounting();
+  const uint8_t isCostMeasuring = Conf.getStatisticsConfigure().isCostMeasuring();
+  const uint8_t isDumpMode = !Conf.getStatisticsConfigure().getDumpFlag();
+
   // int dispatch_count = 0;
   // int dispatch_limit = 1000;
 
@@ -1900,11 +1901,11 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
 
     if (Stat) {
       OpCode Code = PC->getOpCode();
-      if (Conf.getStatisticsConfigure().isInstructionCounting()) {
+      if (isInstructionCounting) {
         Stat->incInstrCount();
       }
       // Add cost. Note: if-else case should be processed additionally.
-      if (Conf.getStatisticsConfigure().isCostMeasuring()) {
+      if (isCostMeasuring) {
         if (unlikely(!Stat->addInstrCost(Code))) {
           const AST::Instruction &Instr = *PC;
           spdlog::error(
@@ -1912,57 +1913,36 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
           return Unexpect(ErrCode::Value::CostLimitExceeded);
         }
       }
-      
-      // if (isInteractiveMode && Conf.getStatisticsConfigure().getDebugMode()) {
-      //   // DebugMode
-      //   // PCのsource locationとbreakで与えられたsource locationが一致するか判定し、一致する場合、isInteractiveMode = trueにする
-      //   // source locationはとりあえず(func_idx, offset)とする
-      //   SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
-      //   std::cout << "PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;
-      //   if (PCSourceLoc == breakpoint) {
-      //     isInteractiveMode = true;
-      //   }
-        
-      //   if (isInteractiveMode) {
-      //     OpCode Code = PC->getOpCode();
-      //     std::cout << "Code is " << std::hex << static_cast<int>(Code) << std::noshowbase << std::endl;
-      //     InteractiveMode(breakpoint, PCSourceLoc, StackMgr);
-      //     isInteractiveMode = false;
-      //   }
-      // }
     }
 
-    if (DumpFlag) {
+    if (unlikely(DumpFlag&isDumpMode)) {
       // DumpFlag=1のとき、すなわち--no-snapshotオプションをつけたときダンプしない
-      if (!Conf.getStatisticsConfigure().getDumpFlag()) {
-        // struct timespec ts1, ts2, t_ts1, t_ts2;
-        struct timespec ts1, ts2;
-        // clock_gettime(CLOCK_MONOTONIC, &t_ts1);
-        // For WasmEdge
-        clock_gettime(CLOCK_MONOTONIC, &ts1);
-        Migr.dumpMemory(StackMgr.getModule());
-        clock_gettime(CLOCK_MONOTONIC, &ts2);
-        std::cerr << "memory, " << getTime(ts1, ts2) << std::endl;
-        // std::cerr << "Success dumpMemory" << std::endl;
+      struct timespec ts1, ts2;
+      // clock_gettime(CLOCK_MONOTONIC, &t_ts1);
+      // For WasmEdge
+      clock_gettime(CLOCK_MONOTONIC, &ts1);
+      Migr.dumpMemory(StackMgr.getModule());
+      clock_gettime(CLOCK_MONOTONIC, &ts2);
+      std::cerr << "memory, " << getTime(ts1, ts2) << std::endl;
+      // std::cerr << "Success dumpMemory" << std::endl;
 
-        clock_gettime(CLOCK_MONOTONIC, &ts1);
-        Migr.dumpGlobal(StackMgr.getModule());
-        clock_gettime(CLOCK_MONOTONIC, &ts2);
-        std::cerr << "global, " << getTime(ts1, ts2) << std::endl;
+      clock_gettime(CLOCK_MONOTONIC, &ts1);
+      Migr.dumpGlobal(StackMgr.getModule());
+      clock_gettime(CLOCK_MONOTONIC, &ts2);
+      std::cerr << "global, " << getTime(ts1, ts2) << std::endl;
 
-        // std::cerr << "Success dumpGlobal" << std::endl;
-        clock_gettime(CLOCK_MONOTONIC, &ts1);
-        Migr.dumpProgramCounter(StackMgr.getModule(), PC);
-        clock_gettime(CLOCK_MONOTONIC, &ts2);
-        std::cerr << "program counter, " << getTime(ts1, ts2) << std::endl;
-        // std::cerr << "Success dumpIter" << std::endl;
+      // std::cerr << "Success dumpGlobal" << std::endl;
+      clock_gettime(CLOCK_MONOTONIC, &ts1);
+      Migr.dumpProgramCounter(StackMgr.getModule(), PC);
+      clock_gettime(CLOCK_MONOTONIC, &ts2);
+      std::cerr << "program counter, " << getTime(ts1, ts2) << std::endl;
+      // std::cerr << "Success dumpIter" << std::endl;
 
-        clock_gettime(CLOCK_MONOTONIC, &ts1);
-        Migr.dumpStack(StackMgr, PC);
-        clock_gettime(CLOCK_MONOTONIC, &ts2);
-        std::cerr << "stack, " << getTime(ts1, ts2) << std::endl;
-        // std::cerr << "Success dumpStack" << std::endl;
-      }
+      clock_gettime(CLOCK_MONOTONIC, &ts1);
+      Migr.dumpStack(StackMgr, PC);
+      clock_gettime(CLOCK_MONOTONIC, &ts2);
+      std::cerr << "stack, " << getTime(ts1, ts2) << std::endl;
+      // std::cerr << "Success dumpStack" << std::endl;
       return {};
     }
 
