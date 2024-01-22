@@ -22,13 +22,6 @@ Expect<void> Executor::instantiate(Runtime::Instance::ModuleInstance &ModInst,
   }
   return {};
 }
-// 
-// Expect<void> Executor::restore(Runtime::Instance::ModuleInstance &ModInst,
-//                                const AST::MemorySection &MemSec) {
-//   for (const auto &MemType : MemSec.getContent()) {
-//     ModInst.
-//   }
-// }
 
 } // namespace Executor
 } // namespace WasmEdge

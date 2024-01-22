@@ -20,119 +20,132 @@ namespace Runtime {
 }
 
 namespace Executor {
-struct SourceLoc {
-  bool operator==(const SourceLoc& rhs) const {
-    return (FuncIdx == rhs.FuncIdx && Offset == rhs.Offset);
-  }
-
-  uint32_t FuncIdx;
-  uint32_t Offset;
-};
-
 class Migrator {
 public:
   /// TODO: ModuleInstanceがnullだったときの名前。重複しないようにする
   const std::string NULL_MOD_NAME = "null";
-  using IterMigratorType = std::map<AST::InstrView::iterator, SourceLoc>;
 
   struct CtrlInfo {
     // AST::InstrView::iterator Iter;
     uint32_t BeginAddrOfs;
     uint32_t TargetAddrOfs;
     uint32_t ElseAddrOfs;
-    uint32_t TspOfs;
     uint32_t SpOfs;
     uint32_t ResultCells;
-    uint32_t ResultCount;
+  };
+
+  struct IteratorKeys {
+    // すべての関数の(先頭アドレス, 関数インデックス)を昇順に並べたリスト
+    std::vector<uintptr_t> AddrVec;
+    std::map<uintptr_t, uint32_t> AddrToIdx;
   };
 
   /// ================
   /// Tools
   /// ================
 
-  /// Find module by name.
-  const Runtime::Instance::ModuleInstance *findModule(std::string_view Name) const {
-    auto Iter = NamedMod.find(Name);
-    if (likely(Iter != NamedMod.cend())) {
-      return Iter->second;
-    }
-    return nullptr;
-  }
-
-  void setIterMigrator(const Runtime::Instance::ModuleInstance* ModInst) {
-    if (IterMigrators.count((std::string)ModInst->getModuleName())) {
-      return;
-    }
-
-    IterMigratorType IterMigrator;
-
+  // void Prepare(const Runtime::Instance::ModuleInstance* ModInst) {
+  void Prepare(const Runtime::Instance::ModuleInstance* ModInst) {
     for (uint32_t I = 0; I < ModInst->getFuncNum(); ++I) {
       Runtime::Instance::FunctionInstance* FuncInst = ModInst->getFunc(I).value();
       AST::InstrView Instr = FuncInst->getInstrs();
       AST::InstrView::iterator PC = Instr.begin();
-      AST::InstrView::iterator PCEnd = Instr.end();
-      
-      uint32_t Offset = 0;
-      while (PC != PCEnd) {
-        IterMigrator[PC] = SourceLoc{I, Offset};
-        Offset++;
-        PC++;
-      }
+      ik.AddrVec.push_back(uintptr_t(PC));
+      ik.AddrToIdx[uintptr_t(PC)] = I;
     }
+    // 門番
+    ik.AddrVec.push_back(UINT64_MAX);
 
-    IterMigrators[(std::string)ModInst->getModuleName()] = IterMigrator;
+    // 昇順ソート
+    std::sort(ik.AddrVec.begin(), ik.AddrVec.end());
+
+    BaseModName = ModInst->getModuleName();
   }
   
-  IterMigratorType getIterMigrator(const Runtime::Instance::ModuleInstance* ModInst) {
-    if (IterMigrators.count((std::string)ModInst->getModuleName())) {
-      return IterMigrators[(std::string)ModInst->getModuleName()];
-    }
-
-    std::string_view ModName = ModInst->getModuleName();
-    setIterMigrator(ModInst);
-    return IterMigrators[(std::string)ModName];
-  }
-
-  IterMigratorType getIterMigratorByName(std::string ModName) {
-    if (IterMigrators.count(ModName)) {
-      return IterMigrators[ModName];
-    } else {
-      IterMigratorType I;
-      return I;
-    }
-  }
-
-  SourceLoc getSourceLoc(AST::InstrView::iterator Iter) {
-    IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
-    // assert(IterMigrator);
-
-    struct SourceLoc Data = IterMigrator[Iter];
-    return Data;
-  }
-  
-  // 命令アドレスの状態表現 (fidx, offset)
-  std::pair<uint32_t, uint32_t> getInstrAddrExpr(const Runtime::Instance::ModuleInstance *ModInst, AST::InstrView::iterator it) {
-      IterMigratorType iterMigr = getIterMigratorByName(BaseModName);
-      struct SourceLoc Data = iterMigr[it];
-      auto Res = ModInst->getFunc(Data.FuncIdx);
-      Runtime::Instance::FunctionInstance* FuncInst = Res.value();
-      AST::InstrView::iterator PCStart = FuncInst->getInstrs().begin();
-      uint32_t Offset = it->getOffset() - PCStart->getOffset();
-
-      return std::make_pair(Data.FuncIdx, Offset);
-  }
-
   uint32_t getFuncIdx(const AST::InstrView::iterator PC) {
     if (PC == nullptr) return -1;
-    struct SourceLoc Data = getSourceLoc(PC);
-    return Data.FuncIdx;
+    
+    auto Ret = std::upper_bound(ik.AddrVec.begin(), ik.AddrVec.end(), uintptr_t(PC));
+    return ik.AddrToIdx[*(Ret-1)];
   }
 
-  // FunctioninstanceからFuncIdxを取得する
-  uint32_t getFuncIdx(const Runtime::Instance::FunctionInstance* Func) {
-    if (Func == nullptr) return -1;
-    AST::InstrView::iterator PC = Func->getInstrs().begin();
-    return getFuncIdx(PC);
+  std::pair<uint32_t, uint32_t> getInstrAddrExpr(const Runtime::Instance::ModuleInstance *ModInst, AST::InstrView::iterator PC) {
+      uint32_t FuncIdx = getFuncIdx(PC);
+      if (FuncIdx == uint32_t(-1)) return std::make_pair(-1, -1);
+      Runtime::Instance::FunctionInstance* FuncInst = ModInst->getFunc(FuncIdx).value();
+      AST::InstrView::iterator PCStart = FuncInst->getInstrs().begin();
+      uint32_t Offset = PC->getOffset() - PCStart->getOffset();
+
+      return std::make_pair(FuncIdx, Offset);
+  }
+
+  // TODO: リファクタしたほうが良さそう
+  std::vector<uint8_t> getTypeStack(uint32_t FuncIdx, uint32_t Offset, bool IsRetAddr) {
+    uint8_t Val;
+    std::ifstream type_table("type_table", std::ios::binary);
+    std::ifstream tablemap_func("tablemap_func", std::ios::binary);
+    std::ifstream tablemap_offset("tablemap_offset", std::ios::binary);
+    
+    if (!type_table | !tablemap_func | !tablemap_offset) {
+      std::cerr << "Please make typestack table." << std::endl;
+      exit(1);
+    }
+
+    /// tablemap_func
+    uint32_t _FuncIdx;
+    uint64_t TablemapOffsetAddr;
+    tablemap_func.seekg(3*sizeof(uint32_t)*FuncIdx, std::ios_base::beg);
+    tablemap_func.read(reinterpret_cast<char *>(&_FuncIdx), sizeof(uint32_t));
+    tablemap_func.read(reinterpret_cast<char *>(&TablemapOffsetAddr), sizeof(uint64_t));
+
+    tablemap_func.close();
+
+    /// tablemap_offset
+    std::vector<uint8_t> TypeStack(0);
+    uint32_t LocalsSize;
+    tablemap_offset.seekg(TablemapOffsetAddr, std::ios_base::beg);
+    // 関数FuncIdxのローカルを取得
+    tablemap_offset.read(reinterpret_cast<char *>(&LocalsSize), sizeof(uint32_t));
+    for (uint32_t I = 0; I < LocalsSize; ++I) {
+      tablemap_offset.read(reinterpret_cast<char *>(&Val), sizeof(uint8_t));
+      TypeStack.push_back(Val);
+    }
+    // Offsetの位置まで移動
+    uint32_t _Offset;
+    uint64_t TypeTableAddr;
+    // uint64_t PreTypeTableAddr;
+    while(1) {
+      tablemap_offset.read(reinterpret_cast<char *>(&_Offset), sizeof(uint32_t));
+      // eofならbreak
+      if (tablemap_offset.eof()) break;
+
+      tablemap_offset.read(reinterpret_cast<char *>(&TypeTableAddr), sizeof(uint64_t));
+      if (Offset == _Offset) break;
+    }
+
+    tablemap_offset.close();
+
+    /// type_table
+    type_table.seekg(TypeTableAddr, std::ios_base::beg);
+    uint32_t StackSize;
+    type_table.read(reinterpret_cast<char *>(&StackSize), sizeof(uint32_t));
+    // リターンアドレスの場合、つまり関数呼び出し途中のときの場合、それ用のスタックを取得する
+    if (IsRetAddr) {
+      type_table.seekg(StackSize, std::ios_base::cur);
+      type_table.read(reinterpret_cast<char *>(&StackSize), sizeof(uint32_t));
+    }
+    for (uint32_t I = 0; I < StackSize; ++I) {
+      type_table.read(reinterpret_cast<char *>(&Val), sizeof(uint8_t));
+      TypeStack.push_back(Val);
+    }
+
+    type_table.close();
+
+    // debug
+    // std::cerr << "[DEBUG]LocalsSize: " << LocalsSize << std::endl;
+    // std::cerr << "[DEBUG]StackSize: " << StackSize << std::endl;
+
+    return TypeStack;
   }
 
 
@@ -149,24 +162,8 @@ public:
       std::cerr << std::endl;
   }
   
-  // void debugFuncOpcode(uint32_t FuncIdx, uint32_t Offset, AST::InstrView::iterator it) {
-  //   std::ofstream opcodeLog;
-  //   opcodeLog.open("wasmedge_opcode.log", std::ios::app);
-  //   opcodeLog << "fidx: " << FuncIdx << "\n";
-  //   for (uint32_t i = 0; i < Offset; i++) it--;
-  //   for (uint32_t i = 0; i < Offset; i++) {
-  //     opcodeLog << i+1 << ") opcode: 0x" << std::hex << static_cast<uint16_t>(it->getOpCode()) << "\n";
-  //     opcodeLog << std::dec;
-  //     it++;
-  //   }
-  // }
-
-
   std::vector<struct CtrlInfo> getCtrlStack(const AST::InstrView::iterator PCNow, Runtime::Instance::FunctionInstance *Func, const std::vector<uint32_t> &WamrCellSums) {
     std::vector<struct CtrlInfo> CtrlStack;
-    
-    IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
-    // assert(IterMigrator);
 
     AST::InstrView::iterator PCStart = Func->getInstrs().begin();
     AST::InstrView::iterator PCEnd = Func->getInstrs().end();
@@ -174,11 +171,11 @@ public:
     
     uint32_t BaseAddr = PCStart->getOffset();
 
-    auto CtrlPush = [&](AST::InstrView::iterator Begin, AST::InstrView::iterator Target, uint32_t SpOfs, uint32_t TspOfs) {
+    auto CtrlPush = [&](AST::InstrView::iterator Begin, AST::InstrView::iterator Target, uint32_t SpOfs) {
       uint32_t BeginOfs = Begin->getOffset() - BaseAddr;
       uint32_t TargetOfs = Target->getOffset() - BaseAddr;
       uint32_t ElseOfs = (Begin + Begin->getJumpElse())->getOffset() - BaseAddr;
-      CtrlStack.push_back({BeginOfs, TargetOfs, ElseOfs, SpOfs, TspOfs, 0, 0});
+      CtrlStack.push_back({BeginOfs, TargetOfs, ElseOfs, SpOfs, 0});
     };
     
     auto CtrlPop = [&]() {
@@ -191,8 +188,8 @@ public:
     
     // 関数ブロックを一番最初にpushする
     // ダミーブロックぽさがすこしあるので、適当に入れる（ちゃんとやると、target_addrに関数の一番最後のアドレスを入れる必要があり、無駄が増えるため）
-    uint32_t SpOfs, TspOfs;
-    CtrlPush(PCStart, PCEnd-1, 0, 0);
+    uint32_t SpOfs;
+    CtrlPush(PCStart, PCEnd-1, 0);
 
     // 命令をなめる
     while (PC < PCNow) {
@@ -201,13 +198,11 @@ public:
         case OpCode::Block:
         case OpCode::If:
           SpOfs = WamrCellSums[PC->getJump().StackEraseBegin];
-          TspOfs = PC->getJump().StackEraseBegin;
-          CtrlPush(PC+1, PC+PC->getJumpEnd(), SpOfs, TspOfs);
+          CtrlPush(PC+1, PC+PC->getJumpEnd(), SpOfs);
           break;
         case OpCode::Loop:
           SpOfs = WamrCellSums[PC->getJump().StackEraseBegin];
-          TspOfs = PC->getJump().StackEraseBegin;
-          CtrlPush(PC+1, PC+1, SpOfs, TspOfs);
+          CtrlPush(PC+1, PC+1, SpOfs);
           break;
 
         // pop
@@ -234,32 +229,14 @@ public:
     ModInst->dumpGlobInst();
   }
 
-  /// TODO: 関数名を中身にあったものにrenameする
-  void preDumpIter(const Runtime::Instance::ModuleInstance* ModInst) {
-    setIterMigrator(ModInst);
-    BaseModName = ModInst->getModuleName();
-  }
 
   Expect<void> dumpProgramCounter(const Runtime::Instance::ModuleInstance* ModInst, AST::InstrView::iterator Iter) {
-    // IterMigratorType IterMigrator = getIterMigratorByName(BaseModName);
-    // assert(IterMigrator);
-
-    // struct SourceLoc Data = IterMigrator[Iter];
     std::ofstream ofs("program_counter.img", std::ios::trunc | std::ios::binary);
     if (!ofs) {
       return Unexpect(ErrCode::Value::IllegalPath);
     }
 
-    // auto Res = ModInst->getFunc(Data.FuncIdx);
-    // if (unlikely(!Res)) {
-    //   return Unexpect(Res);
-    // }
-    // Runtime::Instance::FunctionInstance* FuncInst = Res.value();
-    // AST::InstrView::iterator PCStart = FuncInst->getInstrs().begin();
-
-
     auto [FuncIdx, Offset] = getInstrAddrExpr(ModInst, Iter);
-    // uint32_t Offset = Iter->getOffset() - PCStart->getOffset();
     ofs.write(reinterpret_cast<char *>(&FuncIdx), sizeof(uint32_t));
     ofs.write(reinterpret_cast<char *>(&Offset), sizeof(uint32_t));
 
@@ -269,7 +246,8 @@ public:
 
   void dumpStack(Runtime::StackManager& StackMgr, AST::InstrView::iterator PC) {
     std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
-    std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
+    std::vector<ValVariant> ValueStack = StackMgr.getValueStack();
+    std::vector<std::vector<uint8_t>> TypeStacks(FrameStack.size());
     std::ofstream frame_fout("frame.img", std::ios::trunc | std::ios::binary);
 
     // header file. frame stackのサイズを記録
@@ -277,17 +255,33 @@ public:
     frame_fout.write(reinterpret_cast<char *>(&LenFrame), sizeof(uint32_t));
     frame_fout.close();
     
-    // TypeStackからWAMRのセルの個数累積和みたいにする
-    // 累積和 1-indexed
-    std::vector<uint32_t> WamrCellSums(TypeStack.size()+1, 0);
-    for (uint32_t I = 0; I < TypeStack.size(); I++) {
-        WamrCellSums[I+1] = WamrCellSums[I] + (TypeStack[I] == 0 ? 1 : 2);
+    // 先にフレームごとの型スタックを取得し、TypeStacksにつめる
+    AST::InstrView::iterator PCCopy = PC;
+    uint32_t StackIdx = 1;
+    for (size_t I = FrameStack.size()-1; I > 0; --I, ++StackIdx) {
+      auto f = FrameStack[I];
+      const Runtime::Instance::ModuleInstance* ModInst = f.Module;
+      // NOTE: リターンアドレスは、実行しているアドレスの1つまえのアドレスを持っているので+1する
+      if (I != FrameStack.size() - 1) PCCopy++;
+      auto [FuncIdx, Offset] = getInstrAddrExpr(ModInst, PCCopy);
+      TypeStacks[StackIdx] = getTypeStack(FuncIdx, Offset, I != FrameStack.size()-1);
+      PCCopy = f.From;
     }
 
-    // uint32_t PreStackTop = FrameStack[0].VPos - FrameStack[0].Locals;
+    // TypeStackからWAMRのセルの個数累積和みたいにする
+    // 累積和 1-indexed
+    uint32_t Cur = 0;
+    std::vector<uint32_t> WamrCellSums(StackMgr.size()+1, 0);
+    for (uint32_t StackIdx = TypeStacks.size()-1; StackIdx > 0; --StackIdx) {
+      std::vector<uint8_t> TypeStack = TypeStacks[StackIdx];
+      for (uint32_t I = 0; I < TypeStack.size(); I++) {
+          WamrCellSums[Cur+1] = WamrCellSums[Cur] + TypeStack[I];
+          Cur++;
+      }
+    }
+
     // フレームスタックを上から見ていく。上からstack1, stack2...とする
-    uint32_t StackIdx = 1;
-    uint32_t StackTop = StackMgr.size();
+    StackIdx = 1;
     for (size_t I = FrameStack.size()-1; I > 0; --I, ++StackIdx) {
       std::ofstream ofs("stack" + std::to_string(StackIdx) + ".img", std::ios::trunc | std::ios::binary);
       Runtime::StackManager::Frame f = FrameStack[I];
@@ -316,16 +310,14 @@ public:
 
       // 型スタック
       uint32_t StackBottom = f.VPos - f.Locals;
-      uint32_t TspOfs = StackTop - StackBottom;
-      ofs.write(reinterpret_cast<char *>(&TspOfs), sizeof(uint32_t));
-      for (uint32_t I = StackBottom; I < StackTop; I++) {
-          ofs.write(reinterpret_cast<char *>(&TypeStack[I]), sizeof(uint8_t));
-      }
+      std::vector<uint8_t> TypeStack = TypeStacks[StackIdx];
+      uint32_t TypeStackLen = TypeStack.size();
+      ofs.write(reinterpret_cast<char *>(&TypeStackLen), sizeof(uint32_t));
+      ofs.write(reinterpret_cast<char *>(TypeStack.data()), sizeof(uint8_t) * TypeStackLen);
 
       // 値スタック
-      std::vector<ValVariant> ValueStack = StackMgr.getValueStack();
-      for (uint32_t I = StackBottom; I < StackTop; I++) {
-        ofs.write(reinterpret_cast<char *>(&ValueStack[I].get<uint128_t>()), sizeof(uint32_t) * TypeStack[I]);
+      for (uint32_t I = 0; I < TypeStackLen; I++) {
+        ofs.write(reinterpret_cast<char *>(&ValueStack[StackBottom+I].get<uint128_t>()), sizeof(uint32_t) * TypeStack[I]);
       }
 
       // ラベルスタック
@@ -343,17 +335,13 @@ public:
         ofs.write(reinterpret_cast<char *>(&ci.BeginAddrOfs), sizeof(uint32_t));
         ofs.write(reinterpret_cast<char *>(&ci.TargetAddrOfs), sizeof(uint32_t));
         ofs.write(reinterpret_cast<char *>(&ci.SpOfs), sizeof(uint32_t));
-        ofs.write(reinterpret_cast<char *>(&ci.TspOfs), sizeof(uint32_t));
         ofs.write(reinterpret_cast<char *>(&ci.ResultCells), sizeof(uint32_t));
-        ofs.write(reinterpret_cast<char *>(&ci.ResultCount), sizeof(uint32_t));
       }
 
       ofs.close();
 
       // 各値を更新
       PC = f.From;
-      StackTop = StackBottom;
-      // std::cerr << "[DEBUG]StackTop is " << StackTop << std::endl;
 
       // debug
       // debugFrame(I, EnterFuncIdx, f.Locals, f.Arity, f.VPos);
@@ -447,7 +435,8 @@ public:
     ifs.close();
 
     // LenFrame-1から始まるのは、Stack{LenFrame}.imgがダミーフレームだから
-    for (size_t I = LenFrame-1; I > 0; --I) {
+    AST::InstrView::iterator PC = StackMgr.popFrame();
+    for (size_t I = LenFrame; I > 0; --I) {
       ifs.open("stack" + std::to_string(I) + ".img", std::ios::binary);
 
       // 関数インデックスのロード
@@ -464,6 +453,7 @@ public:
         return Unexpect(ResFrom);
       }
       AST::InstrView::iterator From = ResFrom.value()-1;
+      if (I == LenFrame) From = PC; // 一番bottomのフレームのリターンアドレスはWasmEdge特有なので、それを使う
 
       // ローカルと返り値の数
       auto ResFunc = Module->getFunc(EnterFuncIdx);
@@ -496,7 +486,7 @@ public:
       for (uint32_t I = 0; I < TspOfs; I++) {
         ValVariant Value;
         ifs.read(reinterpret_cast<char *>(&Value), sizeof(uint32_t) * TypeStack[I]);
-        StackMgr.push(Value, TypeStack[I]);
+        StackMgr.push(Value);
       }
 
       ifs.close();
@@ -512,10 +502,10 @@ public:
 private:
   friend class Executor;
 
-  std::map<std::string, IterMigratorType> IterMigrators;
   std::string BaseModName;
   /// \name Module name mapping.
   std::map<std::string, const Runtime::Instance::ModuleInstance *, std::less<>> NamedMod;
+  IteratorKeys ik;
 };
 
 } // namespace Runtime

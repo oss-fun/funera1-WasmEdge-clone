@@ -23,7 +23,6 @@ namespace WasmEdge {
 
 namespace Executor {
 class Executor;
-class Migrator;
 }
 
 namespace Runtime {
@@ -98,7 +97,6 @@ private:
     FailedMod = std::move(Mod);
   }
 
-  friend class Executor::Migrator;
   /// \name Module name mapping.
   std::map<std::string, const Instance::ModuleInstance *, std::less<>> NamedMod;
 

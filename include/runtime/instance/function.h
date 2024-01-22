@@ -23,9 +23,6 @@
 #include <vector>
 
 namespace WasmEdge {
-namespace Executor {
-  class Migrator;
-}
 namespace Runtime {
 namespace Instance {
 
@@ -128,7 +125,6 @@ private:
   };
 
   friend class ModuleInstance;
-  friend class WasmEdge::Executor::Migrator;
   void setModule(const ModuleInstance *Mod) noexcept { ModInst = Mod; }
 
   /// \name Data of function instance.

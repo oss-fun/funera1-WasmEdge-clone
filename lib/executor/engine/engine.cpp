@@ -2,26 +2,30 @@
 // SPDX-FileCopyrightText: 2019-2022 Second State INC
 
 #include "executor/executor.h"
-#include "./debugger.cpp"
 
 #include <array>
 #include <cstdint>
 #include <cstring>
 #include <signal.h>
+#include <fcntl.h>
 
 namespace WasmEdge {
 namespace Executor {
 
 bool DumpFlag;
-bool restoreTestFlag = true;
-bool isInteractiveMode = true;
-SourceLoc breakpoint;
 
 // TODO: signumの処理無駄なのでどうにかする
 void signalHandler(int signum) {
   if (signum)
     DumpFlag = true;
   DumpFlag = true;
+}
+
+int64_t getTime(timespec ts1, timespec ts2) {
+  int64_t sec = ts2.tv_sec - ts1.tv_sec;
+  int64_t nsec = ts2.tv_nsec - ts1.tv_nsec;
+  // std::cerr << sec << ", " << nsec << std::endl;
+  return sec * 1e9 + nsec;
 }
 
 Expect<void> Executor::runExpression(Runtime::StackManager &StackMgr,
@@ -64,7 +68,7 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
 
   if (Res) {
     if (!Conf.getStatisticsConfigure().getDumpFlag() || Conf.getStatisticsConfigure().getRestoreFlag()) {
-      Migr.preDumpIter(Func.getModule());
+      Migr.Prepare(Func.getModule());
     }
 
     // Restore
@@ -213,31 +217,24 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     case OpCode::Select_t: {
       // Pop the i32 value and select values from stack.
       ValVariant CondVal = StackMgr.pop();
-      const uint8_t &T2 = StackMgr.getTypeTop();
       ValVariant Val2 = StackMgr.pop();
-      const uint8_t &T1 = StackMgr.getTypeTop();
       ValVariant Val1 = StackMgr.pop();
 
       // Select the value.
       if (CondVal.get<uint32_t>() == 0) {
         StackMgr.push(Val2);
-        StackMgr.getTypeTop() = T2;
       } else {
         StackMgr.push(Val1);
-        StackMgr.getTypeTop() = T1;
       }
       return {};
     }
 
     // Variable Instructions
     case OpCode::Local__get:
-      // std::cout << "[DEBUG]local.get " << Instr.getTargetIndex() << std::endl;
       return runLocalGetOp(StackMgr, Instr.getStackOffset());
     case OpCode::Local__set:
-      // std::cout << "[DEBUG]local.get " << Instr.getTargetIndex() << std::endl;
       return runLocalSetOp(StackMgr, Instr.getStackOffset());
     case OpCode::Local__tee:
-      // std::cout << "[DEBUG]local.get " << Instr.getTargetIndex() << std::endl;
       return runLocalTeeOp(StackMgr, Instr.getStackOffset());
     case OpCode::Global__get:
       return runGlobalGetOp(StackMgr, Instr.getTargetIndex());
@@ -363,12 +360,10 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
 
     // Const numeric instructions
     case OpCode::I32__const:
-    case OpCode::F32__const:
-      StackMgr.push<uint32_t>(Instr.getNum().get<uint32_t>());
-      return {};
     case OpCode::I64__const:
+    case OpCode::F32__const:
     case OpCode::F64__const:
-      StackMgr.push<uint64_t>(Instr.getNum().get<uint64_t>());
+      StackMgr.push(Instr.getNum());
       return {};
 
     // Unary numeric instructions
@@ -1872,7 +1867,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
   // signal handler
   signal(SIGINT, &signalHandler);
 
-  // int dispatch_count = 0;
+  // int64_t dispatch_count = 0;
   // int dispatch_limit = 1000;
 
   while (PC != PCEnd) {
@@ -1917,16 +1912,33 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     if (DumpFlag) {
       // DumpFlag=1のとき、すなわち--no-snapshotオプションをつけたときダンプしない
       if (!Conf.getStatisticsConfigure().getDumpFlag()) {
+        // struct timespec ts1, ts2, t_ts1, t_ts2;
+        struct timespec ts1, ts2;
+        // clock_gettime(CLOCK_MONOTONIC, &t_ts1);
         // For WasmEdge
+        clock_gettime(CLOCK_MONOTONIC, &ts1);
         Migr.dumpMemory(StackMgr.getModule());
-        std::cerr << "Success dumpMemory" << std::endl;
-        Migr.dumpGlobal(StackMgr.getModule());
-        std::cerr << "Success dumpGlobal" << std::endl;
-        Migr.dumpProgramCounter(StackMgr.getModule(), PC);
-        std::cerr << "Success dumpIter" << std::endl;
+        clock_gettime(CLOCK_MONOTONIC, &ts2);
+        std::cerr << "memory, " << getTime(ts1, ts2) << std::endl;
+        // std::cerr << "Success dumpMemory" << std::endl;
 
+        clock_gettime(CLOCK_MONOTONIC, &ts1);
+        Migr.dumpGlobal(StackMgr.getModule());
+        clock_gettime(CLOCK_MONOTONIC, &ts2);
+        std::cerr << "global, " << getTime(ts1, ts2) << std::endl;
+
+        // std::cerr << "Success dumpGlobal" << std::endl;
+        clock_gettime(CLOCK_MONOTONIC, &ts1);
+        Migr.dumpProgramCounter(StackMgr.getModule(), PC);
+        clock_gettime(CLOCK_MONOTONIC, &ts2);
+        std::cerr << "program counter, " << getTime(ts1, ts2) << std::endl;
+        // std::cerr << "Success dumpIter" << std::endl;
+
+        clock_gettime(CLOCK_MONOTONIC, &ts1);
         Migr.dumpStack(StackMgr, PC);
-        std::cerr << "Success dumpStack" << std::endl;
+        clock_gettime(CLOCK_MONOTONIC, &ts2);
+        std::cerr << "stack, " << getTime(ts1, ts2) << std::endl;
+        // std::cerr << "Success dumpStack" << std::endl;
       }
       return {};
     }
@@ -1935,9 +1947,9 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     // OpCode Code = PC->getOpCode();
     // std::cout << "[DEBUG]OpCode: 0x" << std::hex << (uint16_t)Code << std::dec << std::endl;
     if (auto Res = Dispatch(); !Res) {
-      SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
-      std::cout << "[WASMEDGE ERROR] PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;
-      InteractiveMode(breakpoint, PCSourceLoc, StackMgr);
+      // SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
+      // std::cout << "[WASMEDGE ERROR] PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;
+      // InteractiveMode(breakpoint, PCSourceLoc, StackMgr);
       return Unexpect(Res);
     }
     

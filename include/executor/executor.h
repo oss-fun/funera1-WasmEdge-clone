@@ -693,10 +693,6 @@ private:
   /// Migrator
   Migrator Migr;
   bool RestoreFlag = true;
-  Runtime::StoreManager StoreMgr;
-public:
-  void setStoreMgrToMigr(Runtime::StoreManager& StoreMgr) { Migr.NamedMod = StoreMgr.NamedMod; }
-
 };
 
 } // namespace Executor
