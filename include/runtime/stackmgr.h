@@ -75,7 +75,7 @@ public:
     return V;
   }
 
-  void _pushFrame(const Instance::ModuleInstance *Module,
+  inline void _pushFrame(const Instance::ModuleInstance *Module,
                  AST::InstrView::iterator From,
                  uint32_t LocalNum, uint32_t Arity, uint32_t VPos, bool IsTailCall) noexcept {
     if (likely(!IsTailCall)) {
