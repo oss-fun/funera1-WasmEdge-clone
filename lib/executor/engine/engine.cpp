@@ -1897,6 +1897,8 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
   // int dispatch_count = 0;
   // int dispatch_limit = 1000;
 
+  std::map<OpCode, std::pair<uint64_t, uint32_t>> OpCodeTime;
+
   while (PC != PCEnd) {
     // dispatch_count++;
     // if (dispatch_count == dispatch_limit) DumpFlag = true;
@@ -1950,16 +1952,29 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     }
 
      
-    // OpCode Code = PC->getOpCode();
+    struct timespec ts1, ts2;
+    OpCode Code = PC->getOpCode();
     // std::cout << "[DEBUG]OpCode: 0x" << std::hex << (uint16_t)Code << std::dec << std::endl;
+    
+    clock_gettime(CLOCK_MONOTONIC, &ts1);
     if (auto Res = Dispatch(); !Res) {
       // SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
       // std::cout << "[WASMEDGE ERROR] PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;
       // InteractiveMode(breakpoint, PCSourceLoc, StackMgr);
       return Unexpect(Res);
     }
+    clock_gettime(CLOCK_MONOTONIC, &ts2);
+    OpCodeTime[Code].first += getTime(ts1, ts2);
+    OpCodeTime[Code].second++;
     
     PC++;
+  }
+
+  for (auto [k, v] : OpCodeTime) {
+    std::cerr << "OpCode: " << +(uint8_t)k << std::endl;
+    std::cerr << "\t" << "Total Time: " << v.first << std::endl;
+    std::cerr << "\t" << "Call Count: " << v.second << std::endl;
+    std::cerr << "\t" << "Average Time: " << (double)(v.first / v.second) << std::endl;
   }
   return {};
 }
