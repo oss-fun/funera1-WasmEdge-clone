@@ -66,34 +66,6 @@ public:
     return nullptr;
   }
 
-  // void setIterMigrator(const Runtime::Instance::ModuleInstance* ModInst) {
-  //   if (IterMigrators.count((std::string)ModInst->getModuleName())) {
-  //     return;
-  //   }
-
-  //   IterMigratorType IterMigrator;
-
-  //   uint64_t addr_cnt = 0;
-  //   for (uint32_t I = 0; I < ModInst->getFuncNum(); ++I) {
-  //     Runtime::Instance::FunctionInstance* FuncInst = ModInst->getFunc(I).value();
-  //     AST::InstrView Instr = FuncInst->getInstrs();
-  //     AST::InstrView::iterator PC = Instr.begin();
-  //     AST::InstrView::iterator PCEnd = Instr.end();
-
-  //     std::cerr << "Func[" << I << "]: [" << PC << ", " << PCEnd << "]" << std::endl; 
-  //     addr_cnt += PCEnd - PC;
-      
-  //     uint32_t Offset = 0;
-  //     while (PC != PCEnd) {
-  //       IterMigrator[PC] = SourceLoc{I, Offset};
-  //       Offset++;
-  //       PC++;
-  //     }
-  //   }
-  //   std::cerr << "Address Count: " << addr_cnt << std::endl; 
-
-  //   IterMigrators[(std::string)ModInst->getModuleName()] = IterMigrator;
-  // }
 
   // void Prepare(const Runtime::Instance::ModuleInstance* ModInst) {
   void setIterMigrator(const Runtime::Instance::ModuleInstance* ModInst) {
@@ -110,16 +82,16 @@ public:
     // 昇順ソート
     std::sort(ik.AddrVec.begin(), ik.AddrVec.end());
   }
-  
-  // IterMigratorType getIterMigrator(const Runtime::Instance::ModuleInstance* ModInst) {
-  //   if (IterMigrators.count((std::string)ModInst->getModuleName())) {
-  //     return IterMigrators[(std::string)ModInst->getModuleName()];
-  //   }
 
-  //   std::string_view ModName = ModInst->getModuleName();
-  //   setIterMigrator(ModInst);
-  //   return IterMigrators[(std::string)ModName];
-  // }
+  template<typename T> 
+  void printVec(const std::vector<T>& V) {
+    std::cerr << "[";
+    for (auto &v : V) {
+      uint32_t i = &v - &V[0];
+      std::cerr << +v << (i == V.size()-1 ?  "" : ", ");
+    }
+    std::cerr << "]\n";
+  }
 
   IterMigratorType getIterMigratorByName(std::string ModName) {
     if (IterMigrators.count(ModName)) {
@@ -465,6 +437,17 @@ public:
       for (uint32_t I = 0; I < TypeStackFromFile.size(); ++I) {
         if (TypeStack[StackBottom+I] != TypeStackFromFile[I]) {
           std::cerr << "型スタックの中身が違う. " << std::endl;
+
+          // テーブルから取得した型スタックをdump
+          auto first = TypeStack.cbegin() + StackBottom;
+          auto last = first + TypeStackFromFile.size();
+          std::cerr << "TypeStack from runtime: ";
+          printVec(std::vector<uint8_t>(first, last));
+
+          // テーブルから取得した型スタックをdump
+          std::cerr << "TypeStack from table:   ";
+          printVec(TypeStackFromFile);
+
           break;
         }
       }
