@@ -382,12 +382,26 @@ public:
   void dumpStack(Runtime::StackManager& StackMgr, AST::InstrView::iterator PC) {
     std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
     std::vector<uint8_t> TypeStack = StackMgr.getTypeStack();
+    std::vector<std::vector<uint8_t>> TypeStacks(FrameStack.size());
     std::ofstream frame_fout("frame.img", std::ios::trunc | std::ios::binary);
 
     // header file. frame stackのサイズを記録
     uint32_t LenFrame = FrameStack.size()-1;
     frame_fout.write(reinterpret_cast<char *>(&LenFrame), sizeof(uint32_t));
     frame_fout.close();
+
+    // 先にフレームごとの命令アドレスを持っておく
+    AST::InstrView::iterator PCCopy = PC;
+    uint32_t StackIdx = 1;
+    for (size_t I = FrameStack.size()-1; I > 0; --I, ++StackIdx) {
+      auto f = FrameStack[I];
+      const Runtime::Instance::ModuleInstance* ModInst = f.Module;
+      // NOTE: リターンアドレスは、実行しているアドレスの1つまえのアドレスを持っているので+1する
+      if (I != FrameStack.size() - 1) PCCopy++;
+      auto [FuncIdx, Offset] = getInstrAddrExpr(ModInst, PCCopy);
+      TypeStacks[StackIdx] = getTypeStack(FuncIdx, Offset, I != FrameStack.size()-1);
+      PCCopy = f.From;
+    }
     
     // TypeStackからWAMRのセルの個数累積和みたいにする
     // 累積和 1-indexed
@@ -398,7 +412,7 @@ public:
 
     // uint32_t PreStackTop = FrameStack[0].VPos - FrameStack[0].Locals;
     // フレームスタックを上から見ていく。上からstack1, stack2...とする
-    uint32_t StackIdx = 1;
+    StackIdx = 1;
     uint32_t StackTop = StackMgr.size();
     bool IsRetAddr;
     for (size_t I = FrameStack.size()-1; I > 0; --I, ++StackIdx) {
@@ -443,7 +457,8 @@ public:
                                       ?getInstrAddrExpr(ModInst, PC)
                                       :getInstrAddrExpr(ModInst, PC+1));
       std::cerr << "(FuncIdx, Offset): (" << NowFuncIdx << ", " << NowOffset << ")" << std::endl;
-      std::vector<uint8_t> TypeStackFromFile = getTypeStack(NowFuncIdx, NowOffset, IsRetAddr);
+      // std::vector<uint8_t> TypeStackFromFile = getTypeStack(NowFuncIdx, NowOffset, IsRetAddr);
+      std::vector<uint8_t> TypeStackFromFile = TypeStacks[StackIdx];
 
       // NOTE: ファイルで取得したものが正しいかチェック
       if (TspOfs != TypeStackFromFile.size()) std::cerr << "型スタックのサイズが違う. " << TspOfs << "!=" << TypeStackFromFile.size() << std::endl;
