@@ -1897,7 +1897,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
   // int dispatch_count = 0;
   // int dispatch_limit = 1000;
 
-  std::map<OpCode, std::pair<uint64_t, uint32_t>> OpCodeTime;
+  std::map<OpCode, std::pair<double, uint32_t>> OpCodeTime;
 
   while (PC != PCEnd) {
     // dispatch_count++;
@@ -1964,17 +1964,17 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
       return Unexpect(Res);
     }
     clock_gettime(CLOCK_MONOTONIC, &ts2);
-    OpCodeTime[Code].first += getTime(ts1, ts2);
+    OpCodeTime[Code].first += (double)(getTime(ts1, ts2) / 1e6);
     OpCodeTime[Code].second++;
     
     PC++;
   }
 
   for (auto [k, v] : OpCodeTime) {
-    std::cerr << "OpCode: " << +(uint8_t)k << std::endl;
-    std::cerr << "\t" << "Total Time: " << v.first << std::endl;
-    std::cerr << "\t" << "Call Count: " << v.second << std::endl;
-    std::cerr << "\t" << "Average Time: " << (double)(v.first / v.second) << std::endl;
+    fprintf(stderr, "OpCode: 0x%x\n", +(uint8_t)k);
+    fprintf(stderr, "\tTotal Time: %lf\n", v.first);
+    fprintf(stderr, "\tCall Count: %d\n", v.second);
+    fprintf(stderr, "\tAverage Time: %lf\n", v.first / (double)v.second);
   }
   return {};
 }
