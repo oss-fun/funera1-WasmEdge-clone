@@ -1919,6 +1919,12 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     }
 
     if (unlikely(DumpFlag&isDumpMode)) {
+
+      if (!Migr.isExistTypeStackTable()) {
+        spdlog::error("Not found type stack tables (type_table, type_tablemap_func, type_tablemap_offset)");
+        return {};
+      }
+
       // DumpFlag=1のとき、すなわち--no-snapshotオプションをつけたときダンプしない
       struct timespec ts1, ts2;
       // clock_gettime(CLOCK_MONOTONIC, &t_ts1);

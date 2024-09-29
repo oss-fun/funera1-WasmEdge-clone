@@ -24,7 +24,9 @@ class Migrator {
 public:
   /// TODO: ModuleInstanceがnullだったときの名前。重複しないようにする
   const std::string NULL_MOD_NAME = "null";
-
+  const std::string TYPE_TABLE = "type_table";
+  const std::string TYPE_TABLEMAP_FUNC = "type_tablemap_func";
+  const std::string TYPE_TABLEMAP_OFFSET = "type_tablemap_offset";
   struct CtrlInfo {
     // AST::InstrView::iterator Iter;
     uint32_t BeginAddrOfs;
@@ -82,9 +84,9 @@ public:
   // TODO: リファクタしたほうが良さそう
   std::vector<uint8_t> getTypeStack(uint32_t FuncIdx, uint32_t Offset, bool IsRetAddr) {
     uint8_t Val;
-    std::ifstream type_table("type_table", std::ios::binary);
-    std::ifstream tablemap_func("tablemap_func", std::ios::binary);
-    std::ifstream tablemap_offset("tablemap_offset", std::ios::binary);
+    std::ifstream type_table(TYPE_TABLE, std::ios::binary);
+    std::ifstream tablemap_func(TYPE_TABLEMAP_FUNC, std::ios::binary);
+    std::ifstream tablemap_offset(TYPE_TABLEMAP_OFFSET, std::ios::binary);
 
     /// tablemap_func
     uint32_t _FuncIdx;
@@ -143,6 +145,12 @@ public:
     return TypeStack;
   }
 
+  bool isExistTypeStackTable() {
+    namespace fs = std::filesystem;
+    return fs::exists(TYPE_TABLE) &&
+           fs::exists(TYPE_TABLEMAP_FUNC) &&
+           fs::exists(TYPE_TABLEMAP_OFFSET);
+  }
 
   /// ================
   /// Debug
