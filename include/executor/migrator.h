@@ -47,7 +47,7 @@ public:
   /// ================
 
   // void Prepare(const Runtime::Instance::ModuleInstance* ModInst) {
-  void Prepare(const Runtime::Instance::ModuleInstance* ModInst) {
+  void Prepare(const Runtime::Instance::ModuleInstance* ModInst, std::string dirname) {
     for (uint32_t I = 0; I < ModInst->getFuncNum(); ++I) {
       Runtime::Instance::FunctionInstance* FuncInst = ModInst->getFunc(I).value();
       AST::InstrView Instr = FuncInst->getInstrs();
@@ -60,6 +60,10 @@ public:
 
     // 昇順ソート
     std::sort(ik.AddrVec.begin(), ik.AddrVec.end());
+
+    // ダンプファイルを扱うディレクトリ
+    ImageDir = dirname;
+    std::cerr << "ImageDir: " << ImageDir << std::endl;
 
     BaseModName = ModInst->getModuleName();
   }
@@ -509,6 +513,7 @@ private:
   /// \name Module name mapping.
   std::map<std::string, const Runtime::Instance::ModuleInstance *, std::less<>> NamedMod;
   IteratorKeys ik;
+  std::string ImageDir;
 };
 
 } // namespace Runtime

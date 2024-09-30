@@ -114,6 +114,10 @@ int Tool(struct DriverToolOptions &Opt) noexcept {
   for (const auto &Name : Opt.ForbiddenPlugins.value()) {
     Conf.addForbiddenPlugins(Name);
   }
+  for (const auto &ImageDir : Opt.ImageDir.value()) {
+    Conf.getStatisticsConfigure().setImageDir(ImageDir);
+    break;
+  }
 
   Conf.addHostRegistration(HostRegistration::Wasi);
   const auto InputPath =
