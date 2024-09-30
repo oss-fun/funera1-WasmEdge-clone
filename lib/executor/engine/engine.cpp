@@ -1894,15 +1894,10 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
   const uint8_t isCostMeasuring = Conf.getStatisticsConfigure().isCostMeasuring();
   const uint8_t isDumpMode = !Conf.getStatisticsConfigure().getDumpFlag();
 
-  // int dispatch_count = 0;
-  // int dispatch_limit = 1000;
-
   while (PC != PCEnd) {
-    // dispatch_count++;
-    // if (dispatch_count == dispatch_limit) DumpFlag = true;
-
-
     if (Stat) {
+      if (Stat->getInstrCount() == Stat->getDispatchLimit()) DumpFlag = true;
+
       OpCode Code = PC->getOpCode();
       if (isInstructionCounting) {
         Stat->incInstrCount();

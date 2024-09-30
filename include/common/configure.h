@@ -177,6 +177,14 @@ public:
     return CostLimit.load(std::memory_order_relaxed);
   }
   
+  void setDispatchLimit(uint64_t Count) noexcept {
+    DispatchLimit.store(Count, std::memory_order_relaxed);
+  }
+
+  uint64_t getDispatchLimit() const noexcept {
+    return DispatchLimit.load(std::memory_order_relaxed);
+  }
+
   void setDumpFlag(bool flag) noexcept {
     DumpFlag.store(flag, std::memory_order_relaxed);
   }
@@ -209,6 +217,7 @@ private:
   std::atomic<bool> RestoreFlag   = false;
   std::atomic<bool> DebugMode     = false;
   std::atomic<uint64_t> CostLimit = UINT64_C(-1);
+  std::atomic<uint64_t> DispatchLimit = UINT64_C(-1);
 };
 
 class Configure {
