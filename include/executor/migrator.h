@@ -63,7 +63,10 @@ public:
 
     // ダンプファイルを扱うディレクトリ
     ImageDir = dirname;
-    std::cerr << "ImageDir: " << ImageDir << std::endl;
+    // ディレクトリがなければ作成する
+    if (!std::filesystem::is_directory(ImageDir)) {
+      std::filesystem::create_directory(ImageDir);
+    }
 
     BaseModName = ModInst->getModuleName();
   }
