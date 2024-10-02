@@ -229,9 +229,12 @@ private:
   std::atomic<bool> DebugMode     = false;
   std::atomic<uint64_t> CostLimit = UINT64_C(-1);
   std::atomic<uint64_t> DispatchLimit = UINT64_C(-1);
+<<<<<<< HEAD
 
   mutable std::shared_mutex Mutex;
   std::string ImageDir = "";
+=======
+>>>>>>> 3daf7e9c0375de57b34f3408044b596ff6ba8178
 };
 
 class Configure {
