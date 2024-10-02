@@ -62,7 +62,7 @@ public:
     std::sort(ik.AddrVec.begin(), ik.AddrVec.end());
 
     // ダンプファイルを扱うディレクトリ
-    if (dirname.back() != '/') {
+    if (dirname.size() > 0 && dirname.back() != '/') {
       dirname.push_back('/');
     }
     ImageDir = dirname;
@@ -235,11 +235,11 @@ public:
   /// Dump functions
   /// ================
   void dumpMemory(const Runtime::Instance::ModuleInstance* ModInst) {
-    ModInst->dumpMemInst();
+    ModInst->dumpMemInst(ImageDir);
   }
 
   void dumpGlobal(const Runtime::Instance::ModuleInstance* ModInst) {
-    ModInst->dumpGlobInst();
+    ModInst->dumpGlobInst(ImageDir);
   }
 
 
@@ -261,7 +261,7 @@ public:
     std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
     std::vector<ValVariant> ValueStack = StackMgr.getValueStack();
     std::vector<std::vector<uint8_t>> TypeStacks(FrameStack.size());
-    std::ofstream frame_fout("frame.img", std::ios::trunc | std::ios::binary);
+    std::ofstream frame_fout(ImageDir + "frame.img", std::ios::trunc | std::ios::binary);
 
     // header file. frame stackのサイズを記録
     uint32_t LenFrame = FrameStack.size()-1;
@@ -296,7 +296,7 @@ public:
     // フレームスタックを上から見ていく。上からstack1, stack2...とする
     StackIdx = 1;
     for (size_t I = FrameStack.size()-1; I > 0; --I, ++StackIdx) {
-      std::ofstream ofs("stack" + std::to_string(StackIdx) + ".img", std::ios::trunc | std::ios::binary);
+      std::ofstream ofs(ImageDir + "stack" + std::to_string(StackIdx) + ".img", std::ios::trunc | std::ios::binary);
       Runtime::StackManager::Frame f = FrameStack[I];
  
       // ModuleInstance 
@@ -365,11 +365,11 @@ public:
   /// Restore functions
   /// ================
   void restoreMemory(const Runtime::Instance::ModuleInstance* ModInst) {
-    ModInst->restoreMemInst();
+    ModInst->restoreMemInst(ImageDir);
   }
 
   void restoreGlobal(const Runtime::Instance::ModuleInstance* ModInst) {
-    ModInst->restoreGlobInst();
+    ModInst->restoreGlobInst(ImageDir);
   }
 
   Expect<AST::InstrView::iterator> _restoreIter(const Runtime::Instance::ModuleInstance* ModInst, uint32_t FuncIdx, uint32_t Offset) {
@@ -427,7 +427,7 @@ public:
   }
 
   Expect<AST::InstrView::iterator> restoreProgramCounter(const Runtime::Instance::ModuleInstance* ModInst) {
-    std::ifstream ifs("program_counter.img", std::ios::binary);
+    std::ifstream ifs(ImageDir + "program_counter.img", std::ios::binary);
 
     uint32_t FuncIdx, Offset;
     ifs.read(reinterpret_cast<char *>(&FuncIdx), sizeof(uint32_t));
@@ -443,14 +443,14 @@ public:
     const Runtime::Instance::ModuleInstance *Module = StackMgr.getModule();
 
     uint32_t LenFrame;
-    std::ifstream ifs("frame.img", std::ios::binary);
+    std::ifstream ifs(ImageDir + "frame.img", std::ios::binary);
     ifs.read(reinterpret_cast<char *>(&LenFrame), sizeof(uint32_t));
     ifs.close();
 
     // LenFrame-1から始まるのは、Stack{LenFrame}.imgがダミーフレームだから
     AST::InstrView::iterator PC = StackMgr.popFrame();
     for (size_t I = LenFrame; I > 0; --I) {
-      ifs.open("stack" + std::to_string(I) + ".img", std::ios::binary);
+      ifs.open(ImageDir + "stack" + std::to_string(I) + ".img", std::ios::binary);
 
       // 関数インデックスのロード
       uint32_t EnterFuncIdx;
