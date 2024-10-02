@@ -62,6 +62,9 @@ public:
     std::sort(ik.AddrVec.begin(), ik.AddrVec.end());
 
     // ダンプファイルを扱うディレクトリ
+    if (dirname.back() != '/') {
+      dirname.push_back('/');
+    }
     ImageDir = dirname;
     // ディレクトリがなければ作成する
     if (!std::filesystem::is_directory(ImageDir)) {
@@ -241,7 +244,7 @@ public:
 
 
   Expect<void> dumpProgramCounter(const Runtime::Instance::ModuleInstance* ModInst, AST::InstrView::iterator Iter) {
-    std::ofstream ofs("program_counter.img", std::ios::trunc | std::ios::binary);
+    std::ofstream ofs(ImageDir + "program_counter.img", std::ios::trunc | std::ios::binary);
     if (!ofs) {
       return Unexpect(ErrCode::Value::IllegalPath);
     }
