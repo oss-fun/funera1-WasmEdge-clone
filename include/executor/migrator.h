@@ -162,8 +162,7 @@ public:
     namespace fs = std::filesystem;
     return fs::exists(TYPE_TABLE) &&
            fs::exists(TYPE_TABLEMAP_FUNC) &&
-           fs::exists(TYPE_TABLEMAP_OFFSET) && 
-           fs::exists(OPCODE_OFFSET_TABLE);
+           fs::exists(TYPE_TABLEMAP_OFFSET);
   }
 
   /// ================
