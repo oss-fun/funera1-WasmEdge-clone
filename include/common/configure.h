@@ -143,7 +143,8 @@ public:
         CostMeasuring(RHS.CostMeasuring.load(std::memory_order_relaxed)),
         TimeMeasuring(RHS.TimeMeasuring.load(std::memory_order_relaxed)),
         DumpFlag(RHS.DumpFlag.load(std::memory_order_relaxed)),
-        RestoreFlag(RHS.RestoreFlag.load(std::memory_order_relaxed)) {}
+        RestoreFlag(RHS.RestoreFlag.load(std::memory_order_relaxed)) ,
+        ImageDir(RHS.getImageDir()){}
 
   void setInstructionCounting(bool IsCount) noexcept {
     InstrCounting.store(IsCount, std::memory_order_relaxed);
@@ -185,6 +186,16 @@ public:
     return DumpFlag.load(std::memory_order_relaxed);
   }
 
+  void setImageDir(std::string dir) noexcept {
+    std::unique_lock Lock(Mutex);
+    ImageDir = dir;
+  }
+
+  std::string getImageDir() const noexcept {
+    std::shared_lock Lock(Mutex);
+    return ImageDir;
+  }
+
   void setRestoreFlag(bool flag) noexcept {
     RestoreFlag.store(flag, std::memory_order_relaxed);
   }
@@ -209,6 +220,9 @@ private:
   std::atomic<bool> RestoreFlag   = false;
   std::atomic<bool> DebugMode     = false;
   std::atomic<uint64_t> CostLimit = UINT64_C(-1);
+
+  mutable std::shared_mutex Mutex;
+  std::string ImageDir = "";
 };
 
 class Configure {

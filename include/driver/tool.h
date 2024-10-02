@@ -72,6 +72,7 @@ struct DriverToolOptions {
             PO::Description("Forcibly run WASM in interpreter mode."sv)),
         DumpFlag(PO::Description("Unsnapshot statement to img files."sv)),
         RestoreFlag(PO::Description("Restore statement by img files."sv)),
+        ImageDir(PO::Description("Restore statement by img files."sv), PO::MetaVar("IMAGE_DIR"sv)),
         TimeLim(
             PO::Description(
                 "Limitation of maximum time(in milliseconds) for execution, default value is 0 for no limitations"sv),
@@ -111,6 +112,7 @@ struct DriverToolOptions {
   PO::Option<PO::Toggle> ConfForceInterpreter;
   PO::Option<PO::Toggle> DumpFlag;
   PO::Option<PO::Toggle> RestoreFlag;
+  PO::List<std::string> ImageDir;
   PO::Option<PO::Toggle> DebugMode;
   PO::Option<uint64_t> TimeLim;
   PO::List<int> GasLim;
@@ -143,6 +145,7 @@ struct DriverToolOptions {
         .add_option("enable-all"sv, PropAll)
         .add_option("no-snapshot"sv, DumpFlag)
         .add_option("restore"sv, RestoreFlag)
+        .add_option("image-dir"sv, ImageDir)
         .add_option("debug-mode"sv, DebugMode)
         .add_option("time-limit"sv, TimeLim)
         .add_option("gas-limit"sv, GasLim)
