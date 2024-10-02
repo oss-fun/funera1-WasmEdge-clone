@@ -164,11 +164,11 @@ public:
   /// ================
   void debugFrame(uint32_t FrameIdx, uint32_t EnterFuncIdx, uint32_t Locals, uint32_t Arity, uint32_t VPos) {
       std::string DebugPrefix = "[DEBUG]";
-      std::cerr << DebugPrefix << "Frame Idx: " << FrameIdx << std::endl;
-      std::cerr << DebugPrefix << "EnterFuncIdx: " << EnterFuncIdx << std::endl;
-      std::cerr << DebugPrefix << "Locals: " << Locals << std::endl;
-      std::cerr << DebugPrefix << "Arity: "  << Arity << std::endl;
-      std::cerr << DebugPrefix << "VPos: "   << VPos << std::endl;
+      std::cerr << DebugPrefix << "Frame Idx    : " << FrameIdx << std::endl;
+      std::cerr << DebugPrefix << "EnterFuncIdx : " << EnterFuncIdx << std::endl;
+      std::cerr << DebugPrefix << "Locals       : " << Locals << std::endl;
+      std::cerr << DebugPrefix << "Arity        : "  << Arity << std::endl;
+      std::cerr << DebugPrefix << "VPos         : "   << VPos << std::endl;
       std::cerr << std::endl;
   }
   
