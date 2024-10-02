@@ -41,6 +41,7 @@ Expect<void>
 Executor::runFunction(Runtime::StackManager &StackMgr,
                       const Runtime::Instance::FunctionInstance &Func,
                       Span<const ValVariant> Params) {
+  // std::cerr << "at Executor::runFunction" << std::endl;
   // Set start time.
   if (Stat && Conf.getStatisticsConfigure().isTimeMeasuring()) {
     Stat->startRecordWasm();
@@ -56,6 +57,7 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
   }
 
   // Enter and execute function.
+  // std::cerr << "before enterFunction at Executor::runFunction" << std::endl;
   AST::InstrView::iterator StartIt;
   Expect<void> Res = {};
   if (auto GetIt = enterFunction(StackMgr, Func, Func.getInstrs().end())) {
@@ -70,9 +72,12 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
     }
   }
 
+  // std::cerr << "after enterFunction at Executor::runFunction" << std::endl;
   if (Res) {
     if (!Conf.getStatisticsConfigure().getDumpFlag() || Conf.getStatisticsConfigure().getRestoreFlag()) {
+      // std::cerr << "before migration.prepare at Executor::runFunction" << std::endl;
       Migr.Prepare(Func.getModule());
+      // std::cerr << "after migration.prepare at Executor::runFunction" << std::endl;
     }
 
     // Restore
@@ -105,17 +110,6 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
       Migr.restoreStack(StackMgr);
       clock_gettime(CLOCK_MONOTONIC, &ts2);
       std::cerr << "stack, " << getTime(ts1, ts2) << std::endl;
-
-      // debug: wamrから取り込んだimageをリストアしてすぐdumpすると、同じものが出てくるはず
-      // Migr.dumpMemory(StackMgr.getModule());
-      // std::cerr << "Success dumpMemory" << std::endl;
-      // Migr.dumpGlobal(StackMgr.getModule());
-      // std::cerr << "Success dumpGlobal" << std::endl;
-      // Migr.dumpProgramCounter(StackMgr.getModule(), StartIt);
-      // std::cerr << "Success dumpIter" << std::endl;
-
-      // Migr.dumpStack(StackMgr, StartIt);
-      // std::cerr << "Success dumpStack" << std::endl;
 
       RestoreFlag = false;
     }
@@ -1901,9 +1895,23 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     // dispatch_count++;
     // if (dispatch_count == dispatch_limit) DumpFlag = true;
 
+    {
+      // OpCode Code = PC->getOpCode();
+      // std::cerr << "OpCode: " << +uint8_t(Code) << "\n";
+
+      // デバッグ
+      // auto [FuncIdx, Offset] = Migr.getInstrAddrExpr(StackMgr.getModule(), PC);
+      // std::cerr << "(fidx, off): (" << FuncIdx << ", " << Offset << ")" << std::endl;
+    }
+
 
     if (Stat) {
       OpCode Code = PC->getOpCode();
+
+      // デバッグ
+      // auto [FuncIdx, Offset] = Migr.getInstrAddrExpr(StackMgr.getModule(), PC);
+      // std::cerr << "(fidx, off): (" << FuncIdx << ", " << Offset << ")" << std::endl;
+
       if (isInstructionCounting) {
         Stat->incInstrCount();
       }
@@ -1952,7 +1960,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
       clock_gettime(CLOCK_MONOTONIC, &ts2);
       std::cerr << "stack, " << getTime(ts1, ts2) << std::endl;
       // std::cerr << "Success dumpStack" << std::endl;
-      return {};
+      return Unexpect(ErrCode::Value::CheckpointExecStates);
     }
 
 
