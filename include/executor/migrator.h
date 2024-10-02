@@ -25,8 +25,8 @@ public:
   /// TODO: ModuleInstanceがnullだったときの名前。重複しないようにする
   const std::string NULL_MOD_NAME = "null";
   const std::string TYPE_TABLE = "type_table";
-  const std::string TYPE_TABLEMAP_FUNC = "type_tablemap_func";
-  const std::string TYPE_TABLEMAP_OFFSET = "type_tablemap_offset";
+  const std::string TYPE_TABLEMAP_FUNC = "tablemap_func";
+  const std::string TYPE_TABLEMAP_OFFSET = "tablemap_offset";
   struct CtrlInfo {
     // AST::InstrView::iterator Iter;
     uint32_t BeginAddrOfs;
