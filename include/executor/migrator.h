@@ -61,15 +61,18 @@ public:
     // 昇順ソート
     std::sort(ik.AddrVec.begin(), ik.AddrVec.end());
 
-    // ダンプファイルを扱うディレクトリ
-    if (dirname.size() > 0 && dirname.back() != '/') {
-      dirname.push_back('/');
+    if (dirname.size() > 0) {
+      // dirnameの終端文字は/
+      if (dirname.back() != '/') {
+        dirname.push_back('/');
+      }
+
+      // ディレクトリがなければ作成する
+      if (!std::filesystem::is_directory(dirname)) {
+        std::filesystem::create_directory(dirname);
+      }
     }
     ImageDir = dirname;
-    // ディレクトリがなければ作成する
-    if (!std::filesystem::is_directory(ImageDir)) {
-      std::filesystem::create_directory(ImageDir);
-    }
 
     BaseModName = ModInst->getModuleName();
   }
