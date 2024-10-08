@@ -8,13 +8,14 @@ wasmedge=$(realpath ../../build/tools/wasmedge/wasmedge)
 test-checkpoint() {
     dir=$1
     app=$2
+    limit=$3
 
     pushd $dir
 
     # 1000回dispatchしたところでcheckpointする
     $wasmedge \
         --image-dir actual-images \
-        --dispatch-limit 1000 \
+        --dispatch-limit $limit \
         $app
 
     # 実行が失敗すればfailed
@@ -42,7 +43,8 @@ test-checkpoint() {
 }
 
 
-test-checkpoint "apps/binary-trees" "binary-trees.wasm"
-test-checkpoint "apps/n-body"       "n-body.wasm"
+test-checkpoint "apps/binary-trees" "binary-trees.wasm" 1000
+test-checkpoint "apps/n-body"       "n-body.wasm"       1000
+test-checkpoint "apps/sqlite-bench" "sqlite-bench.wasm" 100000
 
 echo OK
