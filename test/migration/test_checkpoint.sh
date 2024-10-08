@@ -41,8 +41,6 @@ test-checkpoint() {
 }
 
 
-# dir="apps/binary-trees"
-# app="binary-trees.wasm 13"
 test-checkpoint "apps/binary-trees" "binary-trees.wasm"
 test-checkpoint "apps/n-body"       "n-body.wasm"
 
