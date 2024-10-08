@@ -6,11 +6,8 @@ wasmedge=$(realpath ../../build/tools/wasmedge/wasmedge)
 
 
 test-checkpoint() {
-    # TODO: appを入力から受け取れるようにする
     dir=$1
     app=$2
-    # dir="apps/binary-trees"
-    # app="binary-trees.wasm 13"
 
     pushd $dir
 
@@ -46,7 +43,7 @@ test-checkpoint() {
 
 # dir="apps/binary-trees"
 # app="binary-trees.wasm 13"
-test-checkpoint "apps/binary-trees" "binary-trees.wasm 13"
-# test-checkpoint "apps/n-body"       "n-body.wasm 13"
+test-checkpoint "apps/binary-trees" "binary-trees.wasm"
+test-checkpoint "apps/n-body"       "n-body.wasm"
 
 echo OK
