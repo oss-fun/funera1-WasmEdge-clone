@@ -29,6 +29,7 @@ test-checkpoint() {
     status=$?
     if [ $status -eq 0 ]; then
         echo "Success" 
+        rm ./actual-images/*
     else
         echo "Failed"
         diff ./expect-images ./actual-images
