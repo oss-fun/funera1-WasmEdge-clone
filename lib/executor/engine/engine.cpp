@@ -72,7 +72,7 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
 
   if (Res) {
     if (!Conf.getStatisticsConfigure().getDumpFlag() || Conf.getStatisticsConfigure().getRestoreFlag()) {
-      Migr.Prepare(Func.getModule());
+      Migr.Prepare(Func.getModule(), Conf.getStatisticsConfigure().getImageDir());
     }
 
     std::cout << std::boolalpha;
@@ -80,6 +80,9 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
 
     // Restore
     if (RestoreFlag && Conf.getStatisticsConfigure().getRestoreFlag()) {
+      const std::string imageDir = Conf.getStatisticsConfigure().getImageDir();
+      std::cerr << "imageDir: " << imageDir << std::endl;
+
       auto Res = Migr.restoreProgramCounter(Func.getModule());
       if (!Res) {
         return Unexpect(Res);
@@ -1896,7 +1899,6 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
   const uint8_t isInstructionCounting = Conf.getStatisticsConfigure().isInstructionCounting();
   const uint8_t isCostMeasuring = Conf.getStatisticsConfigure().isCostMeasuring();
   const uint8_t isDumpMode = !Conf.getStatisticsConfigure().getDumpFlag();
-
   // int dispatch_count = 0;
   // int dispatch_limit = 1000;
 
