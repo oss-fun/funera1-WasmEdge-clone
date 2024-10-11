@@ -851,7 +851,7 @@ WasmEdge_ConfigureStatisticsSetTimeMeasuring(WasmEdge_ConfigureContext *Cxt,
 WASMEDGE_CAPI_EXPORT extern bool WasmEdge_ConfigureStatisticsIsTimeMeasuring(
     const WasmEdge_ConfigureContext *Cxt);
 
-/// Set the time measuring option for the statistics.
+/// Set the restore option for the statistics.
 ///
 /// This function is thread-safe.
 ///
@@ -861,7 +861,7 @@ WASMEDGE_CAPI_EXPORT extern bool WasmEdge_ConfigureStatisticsIsTimeMeasuring(
 WASMEDGE_CAPI_EXPORT extern void WasmEdge_ConfigureStatisticsSetRestoreFlag(
     WasmEdge_ConfigureContext *Cxt, const bool IsRestore);
 
-/// Get the time measuring option for the statistics.
+/// Get the time restore option for the statistics.
 ///
 /// This function is thread-safe.
 ///
