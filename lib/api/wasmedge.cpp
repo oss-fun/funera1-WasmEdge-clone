@@ -907,6 +907,15 @@ WASMEDGE_CAPI_EXPORT bool WasmEdge_ConfigureStatisticsIsRestore(
   return false;
 }
 
+WASMEDGE_CAPI_EXPORT void 
+WasmEdge_ConfigureStatisticsSetImageDir(WasmEdge_ConfigureContext *Cxt,
+                                          const char *dir) {
+  if (Cxt) {
+    std::string setdir = dir;
+    Cxt->Conf.getStatisticsConfigure().setImageDir(setdir);
+  }
+}
+
 WASMEDGE_CAPI_EXPORT void
 WasmEdge_ConfigureDelete(WasmEdge_ConfigureContext *Cxt) {
   delete Cxt;

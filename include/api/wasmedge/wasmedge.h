@@ -34,6 +34,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <string>
 
 #include "wasmedge/enum_configure.h"
 #include "wasmedge/enum_errcode.h"
@@ -856,17 +857,31 @@ WASMEDGE_CAPI_EXPORT extern bool WasmEdge_ConfigureStatisticsIsTimeMeasuring(
 /// This function is thread-safe.
 ///
 /// \param Cxt the WasmEdge_ConfigureContext to set the boolean value.
-/// \param IsMeasure the boolean value to determine to support time when
+/// \param IsMeasure the boolean value to determine to support restore when
 /// execution or not after compilation by the AOT compiler.
-// WASMEDGE_CAPI_EXPORT extern void 
-// WasmEdge_ConfigureStatisticsSetRestoreFlag(WasmEdge_ConfigureContext *Cxt,
-//     const bool IsRestore);
 WASMEDGE_CAPI_EXPORT extern void WasmEdge_ConfigureStatisticsSetRestoreFlag(
     WasmEdge_ConfigureContext *Cxt, const bool IsRestore);
 
+/// Get the time measuring option for the statistics.
+///
+/// This function is thread-safe.
+///
+/// \param Cxt the WasmEdge_ConfigureContext to get the boolean value.
+/// \returns the boolean value to determine to support restore when
+/// execution or not after compilation by the AOT compiler.
 WASMEDGE_CAPI_EXPORT extern bool WasmEdge_ConfigureStatisticsIsRestore(
     const WasmEdge_ConfigureContext *Cxt);
 
+
+/// Set the image directory option for the statistics.
+///
+/// This function is thread-safe.
+///
+/// \param Cxt the WasmEdge_ConfigureContext to set the string.
+/// \param IsMeasure the boolean value to determine to support image directry when
+/// execution or not after compilation by the AOT compiler.
+WASMEDGE_CAPI_EXPORT extern void WasmEdge_ConfigureStatisticsSetImageDir(
+    WasmEdge_ConfigureContext *Cxt, const char *dir);
 
 /// Deletion of the WasmEdge_ConfigureContext.
 ///
