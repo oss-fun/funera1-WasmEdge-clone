@@ -851,6 +851,23 @@ WasmEdge_ConfigureStatisticsSetTimeMeasuring(WasmEdge_ConfigureContext *Cxt,
 WASMEDGE_CAPI_EXPORT extern bool WasmEdge_ConfigureStatisticsIsTimeMeasuring(
     const WasmEdge_ConfigureContext *Cxt);
 
+/// Set the time measuring option for the statistics.
+///
+/// This function is thread-safe.
+///
+/// \param Cxt the WasmEdge_ConfigureContext to set the boolean value.
+/// \param IsMeasure the boolean value to determine to support time when
+/// execution or not after compilation by the AOT compiler.
+// WASMEDGE_CAPI_EXPORT extern void 
+// WasmEdge_ConfigureStatisticsSetRestoreFlag(WasmEdge_ConfigureContext *Cxt,
+//     const bool IsRestore);
+WASMEDGE_CAPI_EXPORT extern void WasmEdge_ConfigureStatisticsSetRestoreFlag(
+    WasmEdge_ConfigureContext *Cxt, const bool IsRestore);
+
+WASMEDGE_CAPI_EXPORT extern bool WasmEdge_ConfigureStatisticsIsRestore(
+    const WasmEdge_ConfigureContext *Cxt);
+
+
 /// Deletion of the WasmEdge_ConfigureContext.
 ///
 /// After calling this function, the context will be destroyed and should

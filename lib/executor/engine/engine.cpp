@@ -75,6 +75,9 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
       Migr.Prepare(Func.getModule());
     }
 
+    std::cout << std::boolalpha;
+    std::cout << "RestoreFlag: " << RestoreFlag << ", " << "getRestoreFlag(): " << Conf.getStatisticsConfigure().getRestoreFlag() << std::endl;
+
     // Restore
     if (RestoreFlag && Conf.getStatisticsConfigure().getRestoreFlag()) {
       auto Res = Migr.restoreProgramCounter(Func.getModule());
@@ -1952,7 +1955,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
       clock_gettime(CLOCK_MONOTONIC, &ts2);
       std::cerr << "stack, " << getTime(ts1, ts2) << std::endl;
       // std::cerr << "Success dumpStack" << std::endl;
-      return {};
+      return Unexpect(ErrCode::Value::CheckpointExecStates);
     }
 
 

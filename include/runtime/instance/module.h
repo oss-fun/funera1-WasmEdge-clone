@@ -211,7 +211,7 @@ public:
   }
   
   Expect<void> dumpGlobInst() const noexcept {
-    std::ofstream ofs("global.img", std::ios::trunc | std::ios::binary);
+    std::ofstream ofs("/host/global.img", std::ios::trunc | std::ios::binary);
     if (!ofs) {
       return Unexpect(ErrCode::Value::IllegalPath);
     }
@@ -225,7 +225,7 @@ public:
   }
 
   Expect<void> restoreGlobInst() const noexcept {
-    std::ifstream ifs("global.img", std::ios::binary);
+    std::ifstream ifs("/host/global.img", std::ios::binary);
     if (!ifs) {
       return Unexpect(ErrCode::Value::IllegalPath);
     }

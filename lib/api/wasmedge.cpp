@@ -892,6 +892,22 @@ WASMEDGE_CAPI_EXPORT bool WasmEdge_ConfigureStatisticsIsTimeMeasuring(
 }
 
 WASMEDGE_CAPI_EXPORT void
+WasmEdge_ConfigureStatisticsSetRestoreFlag(WasmEdge_ConfigureContext *Cxt,
+                                             const bool IsRestore) {
+  if (Cxt) {
+    Cxt->Conf.getStatisticsConfigure().setRestoreFlag(IsRestore);
+  }
+}
+
+WASMEDGE_CAPI_EXPORT bool WasmEdge_ConfigureStatisticsIsRestore(
+    const WasmEdge_ConfigureContext *Cxt) {
+  if (Cxt) {
+    return Cxt->Conf.getStatisticsConfigure().getRestoreFlag();
+  }    
+  return false;
+}
+
+WASMEDGE_CAPI_EXPORT void
 WasmEdge_ConfigureDelete(WasmEdge_ConfigureContext *Cxt) {
   delete Cxt;
 }
