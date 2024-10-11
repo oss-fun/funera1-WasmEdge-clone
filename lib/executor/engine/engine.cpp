@@ -74,9 +74,9 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
     if (!Conf.getStatisticsConfigure().getDumpFlag() || Conf.getStatisticsConfigure().getRestoreFlag()) {
       Migr.Prepare(Func.getModule(), Conf.getStatisticsConfigure().getImageDir());
     }
-
-    std::cout << std::boolalpha;
-    std::cout << "RestoreFlag: " << RestoreFlag << ", " << "getRestoreFlag(): " << Conf.getStatisticsConfigure().getRestoreFlag() << std::endl;
+    // api経由でフラッグ指定を確認する用
+    // std::cout << std::boolalpha;
+    // std::cout << "RestoreFlag: " << RestoreFlag << ", " << "getRestoreFlag(): " << Conf.getStatisticsConfigure().getRestoreFlag() << std::endl;
 
     // Restore
     if (RestoreFlag && Conf.getStatisticsConfigure().getRestoreFlag()) {

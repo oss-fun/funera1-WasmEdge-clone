@@ -34,7 +34,6 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <string>
 
 #include "wasmedge/enum_configure.h"
 #include "wasmedge/enum_errcode.h"

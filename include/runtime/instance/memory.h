@@ -347,7 +347,7 @@ public:
   
   Expect<void> dumpMemType(std::string filename) {
     // Open file
-    filename = "/host/" + filename + "mem_page_count.img";
+    filename = filename + "mem_page_count.img";
     // filename = filename + "_memtype.img";
     uint32_t CurPageCount = MemType.getLimit().getMin();
 
@@ -409,7 +409,7 @@ public:
   Expect<void> dumpDataPtr(std::string filename) {
     // Open file
     // filename = filename + "_dataptr.img";
-    filename = "/host/" + filename + "memory.img";
+    filename = filename + "memory.img";
     std::ofstream ofs(filename, std::ios::trunc | std::ios::binary);
     if (!ofs) {
       return Unexpect(ErrCode::Value::IllegalPath);
@@ -467,7 +467,7 @@ public:
   Expect<uint32_t> restoreMemType(std::string filename) {
     // Restore MemType
     // filename = filename + "_memtype.img";
-    filename = "/host/" + filename + "mem_page_count.img";
+    filename = filename + "mem_page_count.img";
     std::ifstream ifs(filename, std::ios::binary);
     if (!ifs) {
       return Unexpect(ErrCode::Value::IllegalPath);
@@ -481,7 +481,7 @@ public:
   }
 
   Expect<void> restoreDirtyMemory(std::string filename) {
-    filename = "/host/" + filename + "memory.img";
+    filename = filename + "memory.img";
     std::ifstream ifs(filename, std::ios::binary);
     if (!ifs) {
       return Unexpect(ErrCode::Value::IllegalPath);
