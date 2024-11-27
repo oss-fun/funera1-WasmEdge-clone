@@ -1942,27 +1942,28 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
       clock_gettime(CLOCK_MONOTONIC, &ts1);
       Migr.dumpMemory(StackMgr.getModule());
       clock_gettime(CLOCK_MONOTONIC, &ts2);
-      std::cerr << "memory, " << getTime(ts1, ts2) << std::endl;
+      // std::cerr << "memory, " << getTime(ts1, ts2) << std::endl;
       // std::cerr << "Success dumpMemory" << std::endl;
 
       clock_gettime(CLOCK_MONOTONIC, &ts1);
       Migr.dumpGlobal(StackMgr.getModule());
       clock_gettime(CLOCK_MONOTONIC, &ts2);
-      std::cerr << "global, " << getTime(ts1, ts2) << std::endl;
+      // std::cerr << "global, " << getTime(ts1, ts2) << std::endl;
 
       // std::cerr << "Success dumpGlobal" << std::endl;
       clock_gettime(CLOCK_MONOTONIC, &ts1);
       Migr.dumpProgramCounter(StackMgr.getModule(), PC);
       clock_gettime(CLOCK_MONOTONIC, &ts2);
-      std::cerr << "program counter, " << getTime(ts1, ts2) << std::endl;
-      // std::cerr << "Success dumpIter" << std::endl;
+      // std::cerr << "program counter, " << getTime(ts1, ts2) << std::endl;
 
       clock_gettime(CLOCK_MONOTONIC, &ts1);
       Migr.dumpStack(StackMgr, PC);
       clock_gettime(CLOCK_MONOTONIC, &ts2);
-      std::cerr << "stack, " << getTime(ts1, ts2) << std::endl;
+      // std::cerr << "stack, " << getTime(ts1, ts2) << std::endl;
+      
+      DumpFlag = false;
       // std::cerr << "Success dumpStack" << std::endl;
-      return Unexpect(ErrCode::Value::CheckpointExecStates);
+      // return Unexpect(ErrCode::Value::CheckpointExecStates);
     }
 
 
