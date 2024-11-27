@@ -15,6 +15,7 @@ namespace Executor {
 // TODO: signumの処理無駄なのでどうにかする
 volatile sig_atomic_t DumpFlag;
 void signalHandler(int signum) {
+  // NOTE: DumpFlag = 1としたいが、WasmEdgeのlinterが関数の引数を使わないコードを許さないので、DumpFlag = signum|1としている
   DumpFlag = signum|1;
 }
 
@@ -1920,6 +1921,10 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
       }
     }
 
+    /* NOTE
+        DumpFlag: checkpointシグナルを受け取ったときに1が代入される。受け取るまでは0が入る。
+        isDumpMode: --no-checkpointオプションがない場合に1、ある場合に0が入る 
+    */
     if (unlikely(DumpFlag&isDumpMode)) {
 
       if (!Migr.isExistTypeStackTable()) {
@@ -1927,7 +1932,6 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
         return {};
       }
 
-      // DumpFlag=1のとき、すなわち--no-snapshotオプションをつけたときダンプしない
       struct timespec ts1, ts2;
       // clock_gettime(CLOCK_MONOTONIC, &t_ts1);
       // For WasmEdge
