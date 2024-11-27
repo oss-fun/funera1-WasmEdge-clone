@@ -77,11 +77,16 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
     // api経由でフラッグ指定を確認する用
     // std::cout << std::boolalpha;
     // std::cout << "RestoreFlag: " << RestoreFlag << ", " << "getRestoreFlag(): " << Conf.getStatisticsConfigure().getRestoreFlag() << std::endl;
+    bool EnvFlag = false;
 
+    const char* value = std::getenv("RUNWASI_RESTORE");
+    if (value && std::strcmp(value, "1") == 0){
+      EnvFlag = true;
+    }
     // Restore
-    if (RestoreFlag && Conf.getStatisticsConfigure().getRestoreFlag()) {
+    if (RestoreFlag && (Conf.getStatisticsConfigure().getRestoreFlag() || EnvFlag)) {
       const std::string imageDir = Conf.getStatisticsConfigure().getImageDir();
-      std::cerr << "imageDir: " << imageDir << std::endl;
+      //std::cerr << "imageDir: " << imageDir << std::endl;
 
       auto Res = Migr.restoreProgramCounter(Func.getModule());
       if (!Res) {
@@ -90,7 +95,7 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
 
       struct timespec ts1, ts2;
       clock_gettime(CLOCK_MONOTONIC, &ts1);
-      std::cerr << "boot_end, " << getTime(ts1) << std::endl;
+      //std::cerr << "boot_end, " << getTime(ts1) << std::endl;
 
       clock_gettime(CLOCK_MONOTONIC, &ts1);
       Migr.restoreMemory(StackMgr.getModule());
