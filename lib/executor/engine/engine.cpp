@@ -1937,32 +1937,29 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
 
       // DumpFlag=1のとき、すなわち--no-snapshotオプションをつけたときダンプしない
       struct timespec ts1, ts2;
-      // clock_gettime(CLOCK_MONOTONIC, &t_ts1);
-      // For WasmEdge
+
       clock_gettime(CLOCK_MONOTONIC, &ts1);
       Migr.dumpMemory(StackMgr.getModule());
       clock_gettime(CLOCK_MONOTONIC, &ts2);
-      // std::cerr << "memory, " << getTime(ts1, ts2) << std::endl;
-      // std::cerr << "Success dumpMemory" << std::endl;
+      spdlog::debug("memory, %d", getTime(ts1, ts2));
 
       clock_gettime(CLOCK_MONOTONIC, &ts1);
       Migr.dumpGlobal(StackMgr.getModule());
       clock_gettime(CLOCK_MONOTONIC, &ts2);
-      // std::cerr << "global, " << getTime(ts1, ts2) << std::endl;
+      spdlog::debug("global, %d", getTime(ts1, ts2));
 
       // std::cerr << "Success dumpGlobal" << std::endl;
       clock_gettime(CLOCK_MONOTONIC, &ts1);
       Migr.dumpProgramCounter(StackMgr.getModule(), PC);
       clock_gettime(CLOCK_MONOTONIC, &ts2);
-      // std::cerr << "program counter, " << getTime(ts1, ts2) << std::endl;
+      spdlog::debug("program counter, %d", getTime(ts1, ts2));
 
       clock_gettime(CLOCK_MONOTONIC, &ts1);
       Migr.dumpStack(StackMgr, PC);
       clock_gettime(CLOCK_MONOTONIC, &ts2);
-      // std::cerr << "stack, " << getTime(ts1, ts2) << std::endl;
+      spdlog::debug("stack, %d", getTime(ts1, ts2));
       
       DumpFlag = false;
-      // std::cerr << "Success dumpStack" << std::endl;
       // return Unexpect(ErrCode::Value::CheckpointExecStates);
     }
 
