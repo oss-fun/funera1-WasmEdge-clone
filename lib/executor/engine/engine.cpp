@@ -1899,7 +1899,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
   struct sigaction sa;
   memset(&sa, 0, sizeof(sa));
   sa.sa_handler = signalHandler;
-  sigaction(SIGINT, &sa, nullptr);
+  sigaction(SIGUSR1, &sa, nullptr);
 
   const uint8_t isInstructionCounting = Conf.getStatisticsConfigure().isInstructionCounting();
   const uint8_t isCostMeasuring = Conf.getStatisticsConfigure().isCostMeasuring();
