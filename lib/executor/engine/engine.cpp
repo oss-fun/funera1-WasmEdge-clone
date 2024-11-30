@@ -12,6 +12,7 @@
 namespace WasmEdge {
 namespace Executor {
 
+bool donePrepare = false;
 // TODO: signumの処理無駄なのでどうにかする
 volatile sig_atomic_t DumpFlag;
 void signalHandler(int signum) {
@@ -71,8 +72,10 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
   }
 
   if (Res) {
-    if (!Conf.getStatisticsConfigure().getDumpFlag() || Conf.getStatisticsConfigure().getRestoreFlag()) {
+    if (!donePrepare) {
+      // TODO: ホストからWasm関数を呼び出すような場合、Prepareは何回も呼ばれている。Prepareは1回のみ呼ばれる想定なので、修正する
       Migr.Prepare(Func.getModule(), Conf.getStatisticsConfigure().getImageDir());
+      donePrepare = true;
     }
     // api経由でフラッグ指定を確認する用
     // std::cout << std::boolalpha;
@@ -134,6 +137,8 @@ Executor::runFunction(Runtime::StackManager &StackMgr,
     // If not terminated, execute the instructions in interpreter mode.
     // For the entering AOT or host functions, the `StartIt` is equal to the end
     // of instruction list, therefore the execution will return immediately.
+
+    std::cerr << "execute" << std::endl;
     Res = execute(StackMgr, StartIt, Func.getInstrs().end());
   }
 
@@ -1896,11 +1901,15 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
   };
 
   // signal handler
+  // TODO: sigactionも1回だけにしたい
+  std::cerr << "before sigaction" << std::endl;
   struct sigaction sa;
   memset(&sa, 0, sizeof(sa));
   sa.sa_handler = signalHandler;
+  // sigaction(SIGUSR1, &sa, nullptr);
   sigaction(SIGUSR1, &sa, nullptr);
 
+  std::cerr << "after sigaction" << std::endl;
   const uint8_t isInstructionCounting = Conf.getStatisticsConfigure().isInstructionCounting();
   const uint8_t isCostMeasuring = Conf.getStatisticsConfigure().isCostMeasuring();
   const uint8_t isDumpMode = !Conf.getStatisticsConfigure().getDumpFlag();
@@ -1912,6 +1921,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
     // if (dispatch_count == dispatch_limit) DumpFlag = true;
 
 
+    // std::cerr << "Stat" << std::endl;
     if (Stat) {
       OpCode Code = PC->getOpCode();
       if (isInstructionCounting) {
@@ -1928,7 +1938,10 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
       }
     }
 
+    // std::cerr << "dump" << std::endl;
     if (unlikely(DumpFlag&isDumpMode)) {
+     spdlog::set_level(spdlog::level::debug); // デバッグレベルに設定
+     // std::cerr << "execute dump" << std::endl;
 
       if (!Migr.isExistTypeStackTable()) {
         spdlog::error("Not found type stack tables (type_table, type_tablemap_func, type_tablemap_offset)");
@@ -1941,23 +1954,23 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
       clock_gettime(CLOCK_MONOTONIC, &ts1);
       Migr.dumpMemory(StackMgr.getModule());
       clock_gettime(CLOCK_MONOTONIC, &ts2);
-      spdlog::debug("memory, %d", getTime(ts1, ts2));
+      spdlog::debug("memory, {:d}", getTime(ts1, ts2));
 
       clock_gettime(CLOCK_MONOTONIC, &ts1);
       Migr.dumpGlobal(StackMgr.getModule());
       clock_gettime(CLOCK_MONOTONIC, &ts2);
-      spdlog::debug("global, %d", getTime(ts1, ts2));
+      spdlog::debug("global, {:d}", getTime(ts1, ts2));
 
       // std::cerr << "Success dumpGlobal" << std::endl;
       clock_gettime(CLOCK_MONOTONIC, &ts1);
       Migr.dumpProgramCounter(StackMgr.getModule(), PC);
       clock_gettime(CLOCK_MONOTONIC, &ts2);
-      spdlog::debug("program counter, %d", getTime(ts1, ts2));
+      spdlog::debug("program counter, {:d}", getTime(ts1, ts2));
 
       clock_gettime(CLOCK_MONOTONIC, &ts1);
       Migr.dumpStack(StackMgr, PC);
       clock_gettime(CLOCK_MONOTONIC, &ts2);
-      spdlog::debug("stack, %d", getTime(ts1, ts2));
+      spdlog::debug("stack, {:d}", getTime(ts1, ts2));
       
       DumpFlag = false;
       // return Unexpect(ErrCode::Value::CheckpointExecStates);
@@ -1965,7 +1978,7 @@ Expect<void> Executor::execute(Runtime::StackManager &StackMgr,
 
 
     // OpCode Code = PC->getOpCode();
-    // std::cout << "[DEBUG]OpCode: 0x" << std::hex << (uint16_t)Code << std::dec << std::endl;
+    // std::cerr << "[DEBUG]OpCode: 0x" << std::hex << (uint16_t)Code << std::dec << std::endl;
     if (auto Res = Dispatch(); !Res) {
       // SourceLoc PCSourceLoc = Migr.getSourceLoc(PC);
       // std::cout << "[WASMEDGE ERROR] PC is " << PCSourceLoc.FuncIdx << " " << PCSourceLoc.Offset << std::endl;

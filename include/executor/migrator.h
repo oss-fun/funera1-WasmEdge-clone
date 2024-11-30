@@ -75,6 +75,7 @@ public:
     ImageDir = dirname;
 
     BaseModName = ModInst->getModuleName();
+    // std::cerr << "mod_name: " << BaseModName << std::endl;
   }
   
   uint32_t getFuncIdx(const AST::InstrView::iterator PC) {
@@ -97,9 +98,9 @@ public:
   // TODO: リファクタしたほうが良さそう
   std::vector<uint8_t> getTypeStack(uint32_t FuncIdx, uint32_t Offset, bool IsRetAddr) {
     uint8_t Val;
-    std::ifstream type_table(TYPE_TABLE, std::ios::binary);
-    std::ifstream tablemap_func(TYPE_TABLEMAP_FUNC, std::ios::binary);
-    std::ifstream tablemap_offset(TYPE_TABLEMAP_OFFSET, std::ios::binary);
+    std::ifstream type_table(ImageDir + TYPE_TABLE, std::ios::binary);
+    std::ifstream tablemap_func(ImageDir + TYPE_TABLEMAP_FUNC, std::ios::binary);
+    std::ifstream tablemap_offset(ImageDir + TYPE_TABLEMAP_OFFSET, std::ios::binary);
 
     /// tablemap_func
     uint32_t _FuncIdx;
@@ -160,9 +161,9 @@ public:
 
   bool isExistTypeStackTable() {
     namespace fs = std::filesystem;
-    return fs::exists(TYPE_TABLE) &&
-           fs::exists(TYPE_TABLEMAP_FUNC) &&
-           fs::exists(TYPE_TABLEMAP_OFFSET);
+    return fs::exists(ImageDir + TYPE_TABLE) &&
+           fs::exists(ImageDir + TYPE_TABLEMAP_FUNC) &&
+           fs::exists(ImageDir + TYPE_TABLEMAP_OFFSET);
   }
 
   /// ================
@@ -260,7 +261,9 @@ public:
     return {};
   }
 
-  void dumpStack(Runtime::StackManager& StackMgr, AST::InstrView::iterator PC) {
+  void dumpStack(Runtime::StackManager& StackMgr, AST::InstrView::iterator PCBase) {
+    AST::InstrView::iterator PC = PCBase;
+
     std::vector<Runtime::StackManager::Frame> FrameStack = StackMgr.getFrameStack();
     std::vector<ValVariant> ValueStack = StackMgr.getValueStack();
     std::vector<std::vector<uint8_t>> TypeStacks(FrameStack.size());
@@ -270,6 +273,7 @@ public:
     uint32_t LenFrame = FrameStack.size()-1;
     frame_fout.write(reinterpret_cast<char *>(&LenFrame), sizeof(uint32_t));
     frame_fout.close();
+    spdlog::debug("LenFrame: {:d}", LenFrame);
     
     // 先にフレームごとの型スタックを取得し、TypeStacksにつめる
     AST::InstrView::iterator PCCopy = PC;
@@ -280,9 +284,12 @@ public:
       // NOTE: リターンアドレスは、実行しているアドレスの1つまえのアドレスを持っているので+1する
       if (I != FrameStack.size() - 1) PCCopy++;
       auto [FuncIdx, Offset] = getInstrAddrExpr(ModInst, PCCopy);
+      spdlog::debug("get pc addr");
       TypeStacks[StackIdx] = getTypeStack(FuncIdx, Offset, I != FrameStack.size()-1);
+      spdlog::debug("get type stack in func_{:d}", FuncIdx);
       PCCopy = f.From;
     }
+    spdlog::debug("complete type stack");
 
     // TypeStackからWAMRのセルの個数累積和みたいにする
     // 累積和 1-indexed
@@ -295,10 +302,12 @@ public:
           Cur++;
       }
     }
+    spdlog::debug("get control stack");
 
     // フレームスタックを上から見ていく。上からstack1, stack2...とする
     StackIdx = 1;
     for (size_t I = FrameStack.size()-1; I > 0; --I, ++StackIdx) {
+      spdlog::debug("stack_{:d} dumps contents", StackIdx);
       std::ofstream ofs(ImageDir + "stack" + std::to_string(StackIdx) + ".img", std::ios::trunc | std::ios::binary);
       Runtime::StackManager::Frame f = FrameStack[I];
  
@@ -307,8 +316,9 @@ public:
 
       // ModInstがnullの場合、ModNameだけ出力してcontinue
       if (ModInst == nullptr) {
-        std::cerr << "ModInst is nullptr" << std::endl;
-        exit(1);
+        spdlog::error("Modul instance is nullptr");
+        return;
+        // exit(1);
       }
 
       // 関数インデックス
@@ -339,8 +349,8 @@ public:
       // ラベルスタック
       auto Res = ModInst->getFunc(EnterFuncIdx);
       if (!Res) {
-        std::cerr << "FuncIdx isn't correct" << std::endl; 
-        exit(1);
+        spdlog::error("Modul instance is nullptr");
+        return;
       }
       Runtime::Instance::FunctionInstance* FuncInst = Res.value();
       std::vector<struct CtrlInfo> CtrlStack = getCtrlStack(PC, FuncInst, WamrCellSums);
